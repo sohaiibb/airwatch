@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { generateDemoStations, generateDemoHistory } from './utils';
 
 const url = import.meta.env.VITE_SUPABASE_URL || '';
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -42,4 +43,31 @@ export async function updateStation(id, updates) {
   const { data, error } = await supabase.from('stations').update(updates).eq('id', id).select().single();
   if (error) throw error;
   return data;
+}
+
+export async function getLatestReadings(stationIds) {
+  const results = {};
+  await Promise.all(stationIds.map(async id => {
+    const reading = await getLatestReading(id);
+    if (reading) results[id] = reading;
+  }));
+  return results;
+}
+
+export function getDemoStations() {
+  return generateDemoStations().map(({ reading, ...s }) => s);
+}
+
+export function getDemoReadings() {
+  const map = {};
+  generateDemoStations().forEach(s => { map[s.id] = s.reading; });
+  return map;
+}
+
+export function getDemoHistory(_stationId, hours = 24) {
+  return generateDemoHistory(hours);
+}
+
+export function getDemoDaily() {
+  return generateDemoHistory(720);
 }

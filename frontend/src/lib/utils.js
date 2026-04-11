@@ -20,8 +20,19 @@ export const NCEC_DEFAULTS = {
 export const glass = (x = {}) => ({ background:'rgba(255,255,255,0.42)', backdropFilter:'blur(24px) saturate(1.6)', WebkitBackdropFilter:'blur(24px) saturate(1.6)', borderRadius:22, border:'1px solid rgba(255,255,255,0.55)', boxShadow:'0 2px 32px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.7), inset 0 -1px 0 rgba(255,255,255,0.15)', ...x });
 export const glassInner = (x = {}) => ({ background:'rgba(255,255,255,0.30)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', borderRadius:14, border:'1px solid rgba(255,255,255,0.45)', ...x });
 
+export const POLLUTANTS = [
+  { key: 'pm25', name: 'PM2.5', unit: 'µg/m³', color: '#3B82F6', threshold: 35, max: 150 },
+  { key: 'pm10', name: 'PM10', unit: 'µg/m³', color: '#8B5CF6', threshold: 340, max: 600 },
+  { key: 'so2',  name: 'SO₂',  unit: 'µg/m³', color: '#F59E0B', threshold: 350, max: 500 },
+  { key: 'no2',  name: 'NO₂',  unit: 'µg/m³', color: '#06B6D4', threshold: 200, max: 300 },
+  { key: 'o3',   name: 'O₃',   unit: 'µg/m³', color: '#EC4899', threshold: 200, max: 300 },
+  { key: 'co',   name: 'CO',   unit: 'mg/m³', color: '#10B981', threshold: 40,  max: 60  },
+];
+
 export const fmt = (v, d = 1) => v != null ? Number(v).toFixed(d) : '—';
 export const fmtTime = (ts) => new Date(ts).toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', hour12:false });
+export const formatTime = fmtTime;
+export const formatDate = (ts) => new Date(ts).toLocaleDateString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', hour12:false });
 
 export function generateDemoStations() {
   const defs = [
