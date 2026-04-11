@@ -14,7 +14,7 @@ export const NCEC_DEFAULTS = {
   so2:  { label: 'SO₂',  unit: 'µg/m³', threshold_1h: 350, color: '#F59E0B' },
   no2:  { label: 'NO₂',  unit: 'µg/m³', threshold_1h: 200, color: '#06B6D4' },
   o3:   { label: 'O₃',   unit: 'µg/m³', threshold_1h: 200, color: '#EC4899' },
-  co:   { label: 'CO',   unit: 'mg/m³', threshold_1h: 40,  color: '#10B981' },
+  co:   { label: 'CO',   unit: 'µg/m³', threshold_1h: 40000, color: '#10B981' },
 };
 
 export const glass = (x = {}) => ({ background:'rgba(255,255,255,0.42)', backdropFilter:'blur(24px) saturate(1.6)', WebkitBackdropFilter:'blur(24px) saturate(1.6)', borderRadius:22, border:'1px solid rgba(255,255,255,0.55)', boxShadow:'0 2px 32px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.7), inset 0 -1px 0 rgba(255,255,255,0.15)', ...x });
@@ -26,7 +26,7 @@ export const POLLUTANTS = [
   { key: 'so2',  name: 'SO₂',  unit: 'µg/m³', color: '#F59E0B', threshold: 350, max: 500 },
   { key: 'no2',  name: 'NO₂',  unit: 'µg/m³', color: '#06B6D4', threshold: 200, max: 300 },
   { key: 'o3',   name: 'O₃',   unit: 'µg/m³', color: '#EC4899', threshold: 200, max: 300 },
-  { key: 'co',   name: 'CO',   unit: 'mg/m³', color: '#10B981', threshold: 40,  max: 60  },
+  { key: 'co',   name: 'CO',   unit: 'µg/m³', color: '#10B981', threshold: 40000, max: 60000 },
 ];
 
 export const fmt = (v, d = 1) => v != null ? Number(v).toFixed(d) : '—';
