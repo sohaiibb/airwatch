@@ -45,6 +45,16 @@ export async function updateStation(id, updates) {
   return data;
 }
 
+export async function getReadingsByDateRange(stationId, from, to) {
+  const { data } = await supabase
+    .from('readings').select('*')
+    .eq('station_id', stationId)
+    .gte('timestamp', from)
+    .lte('timestamp', to)
+    .order('timestamp', { ascending: true });
+  return data || [];
+}
+
 export async function getLatestReadings(stationIds) {
   const results = {};
   await Promise.all(stationIds.map(async id => {

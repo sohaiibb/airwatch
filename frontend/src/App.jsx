@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Charts from './pages/Charts';
 import AdminStations from './pages/AdminStations';
+import Reports from './pages/Reports';
 
 const NAV_CLIENT = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -99,7 +100,7 @@ export default function App() {
       case 'dashboard': return <Dashboard profile={profile} />;
       case 'charts': return <Charts profile={profile} />;
       case 'admin-stations': return isAdmin ? <AdminStations /> : <Dashboard profile={profile} />;
-      case 'reports': return <Placeholder title="Reports" desc="Coming in Phase 2." icon={FileText} />;
+      case 'reports': return <Reports profile={profile} />;
       case 'alerts': return <Placeholder title="Alerts" desc="Coming in Phase 2." icon={Bell} />;
       case 'settings': return <Placeholder title="Settings" desc="Coming in Phase 2." icon={Settings} />;
       case 'admin-clients': return <Placeholder title="Manage Clients" desc="Coming in Phase 2." icon={Users} />;
