@@ -24,14 +24,18 @@ async def poll_enggenv(client, station):
     did = station.get("device_id")
     if not url or not did: return None
     try:
-        r = await client.get(f"{url}/getLatestData/{did}", timeout=15)
+        r = await client.get(f"{url}?action=getLatestData&device={did}", timeout=15)
         raw = r.json()
-        data = raw[0] if isinstance(raw, list) else raw
+        if not raw.get("success"): return None
+        data = raw.get("data", [None])[0]
         if not data: return None
         m = station.get("field_mapping", {})
-        gf = lambda k: (lambda v: float(v) if v is not None else None)(data.get(m.get(k, k)))
+        def gf(k):
+            v = data.get(m.get(k, k))
+            try: return float(v) if v is not None else None
+            except (TypeError, ValueError): return None
         return {"station_id": station["id"], "timestamp": data.get("timestamp", datetime.utcnow().isoformat()),
-                "pm25": gf("pm25"), "pm10": gf("pm10"), "so2": gf("so2"), "no2": gf("no2"),
+                "pm25": gf("PM2.5"), "pm10": gf("pm10"), "so2": gf("so2"), "no2": gf("no2"),
                 "o3": gf("o3"), "co": gf("co"), "temperature": gf("temperature"),
                 "humidity": gf("humidity"), "pressure": gf("pressure"),
                 "wind_speed": gf("wind_speed"), "wind_direction": gf("wind_direction"),
