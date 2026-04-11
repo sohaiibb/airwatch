@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, CircleMarker, Tooltip as LTooltip, useMap } from 'react-leaflet';
 import {
@@ -92,6 +92,8 @@ export default function Dashboard({ profile }) {
   const [sparkData, setSparkData] = useState({});
   const [isDemo, setIsDemo] = useState(false);
   const navigate = useNavigate();
+  const stationsRef = useRef([]);
+  const wsRef = useRef(null);
 
   useEffect(() => {
     async function load() {
@@ -99,18 +101,49 @@ export default function Dashboard({ profile }) {
         const st = await getStations();
         if (st.length > 0) {
           setStations(st);
+          stationsRef.current = st;
           const r = await getLatestReadings(st.map(s => s.id));
           setReadings(r);
           setIsDemo(false);
         } else throw new Error('No stations');
       } catch {
-        setStations(getDemoStations());
+        const demo = getDemoStations();
+        setStations(demo);
+        stationsRef.current = demo;
         setReadings(getDemoReadings());
         setIsDemo(true);
       }
     }
     load();
   }, []);
+
+  // WebSocket: reconnect to backend and refresh readings on each poll cycle
+  useEffect(() => {
+    const backendUrl = import.meta.env.VITE_BACKEND_URL;
+    if (!backendUrl || isDemo) return;
+    const wsUrl = backendUrl.replace(/^https/, 'wss').replace(/^http/, 'ws') + '/ws';
+    let cancelled = false;
+
+    function connect() {
+      if (cancelled) return;
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+      ws.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg.type === 'update' && stationsRef.current.length) {
+            getLatestReadings(stationsRef.current.map(s => s.id)).then(setReadings);
+          }
+        } catch {}
+      };
+      ws.onclose = () => { if (!cancelled) setTimeout(connect, 5000); };
+    }
+    connect();
+    return () => {
+      cancelled = true;
+      wsRef.current?.close();
+    };
+  }, [isDemo]);
 
   // Load sparkline data for selected station
   useEffect(() => {
