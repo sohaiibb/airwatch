@@ -593,3 +593,220 @@ async def backfill_station(station_id: str, req: BackfillRequest):
         "errors":       total_errors,
         "chunks":       chunks,
     }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Client Management API
+# ─────────────────────────────────────────────────────────────────────────────
+import secrets, string
+
+def _gen_temp_password(length: int = 16) -> str:
+    chars = string.ascii_letters + string.digits + "!@#$%"
+    return ''.join(secrets.choice(chars) for _ in range(length))
+
+def _default_permissions() -> list:
+    """Return default permission rows for a new client org."""
+    return [
+        {
+            "permission_type": "page_access",
+            "permission_value": {"dashboard": True, "charts": True, "data": True, "reports": True,
+                                  "compliance": False, "wind_rose": False, "alerts": True},
+        },
+        {
+            "permission_type": "visible_parameters",
+            "permission_value": {"pm25": True, "pm10": True, "so2": True, "no2": True, "o3": True,
+                                  "co": True, "temp": True, "rh": True, "ws": True, "wd": True},
+        },
+        {
+            "permission_type": "report_access",
+            "permission_value": {"preview": True, "pdf": True, "csv": False, "excel": False,
+                                  "max_days": 30, "averaging": ["1-hour", "24-hour"]},
+        },
+        {
+            "permission_type": "data_access",
+            "permission_value": {"raw": False, "1min": False, "hourly": True, "daily": True,
+                                  "csv": False, "excel": False, "max_days": 30},
+        },
+        {
+            "permission_type": "dashboard_access",
+            "permission_value": {"aqi": True, "map": True, "health": True, "ncec": False, "sparklines": True},
+        },
+    ]
+
+# ── Organizations ─────────────────────────────────────────────────────────────
+
+@app.get("/api/organizations")
+def list_organizations():
+    require_sb()
+    orgs = sb.table("organizations").select("*").neq("slug", "hfcl").order("name").execute().data or []
+    for org in orgs:
+        stations_count = len(sb.table("station_assignments").select("id").eq("organization_id", org["id"]).execute().data or [])
+        users_count = len(sb.table("profiles").select("id").eq("org_id", org["id"]).execute().data or [])
+        org["stations_count"] = stations_count
+        org["users_count"] = users_count
+    return orgs
+
+@app.post("/api/organizations")
+async def create_organization(body: dict):
+    require_sb()
+    name = body.get("name", "").strip()
+    if not name:
+        raise HTTPException(400, "Organization name is required")
+    slug = name.lower().replace(" ", "-").replace("_", "-")[:50]
+    row = {
+        "name": name,
+        "slug": slug,
+        "contact_name": body.get("contact_name"),
+        "contact_email": body.get("contact_email"),
+        "contact_phone": body.get("contact_phone"),
+        "address": body.get("address"),
+        "is_active": True,
+    }
+    res = sb.table("organizations").insert(row).execute()
+    org = res.data[0] if res.data else {}
+    # Insert default permissions (org-level, station_id=null)
+    if org.get("id"):
+        for perm in _default_permissions():
+            sb.table("client_permissions").upsert({
+                "organization_id": org["id"],
+                "station_id": None,
+                **perm,
+            }).execute()
+    return org
+
+@app.put("/api/organizations/{org_id}")
+async def update_organization(org_id: str, body: dict):
+    require_sb()
+    allowed = {"name", "contact_name", "contact_email", "contact_phone", "address", "is_active"}
+    updates = {k: v for k, v in body.items() if k in allowed}
+    if not updates:
+        raise HTTPException(400, "No valid fields to update")
+    sb.table("organizations").update(updates).eq("id", org_id).execute()
+    return {"ok": True}
+
+@app.delete("/api/organizations/{org_id}")
+def delete_organization(org_id: str):
+    require_sb()
+    # Cascade: station_assignments, client_permissions, profiles are FK-cascaded
+    # Delete auth users first
+    profiles = sb.table("profiles").select("id").eq("org_id", org_id).execute().data or []
+    for p in profiles:
+        try:
+            sb.auth.admin.delete_user(p["id"])
+        except Exception:
+            pass
+    sb.table("organizations").delete().eq("id", org_id).execute()
+    return {"ok": True}
+
+# ── Station Assignments ────────────────────────────────────────────────────────
+
+@app.get("/api/organizations/{org_id}/stations")
+def get_org_stations(org_id: str):
+    require_sb()
+    rows = (sb.table("station_assignments")
+            .select("*, stations(id, name, device_id, status, is_active, latitude, longitude)")
+            .eq("organization_id", org_id)
+            .execute().data or [])
+    return [{"assignment_id": r["id"], **r["stations"]} for r in rows if r.get("stations")]
+
+@app.post("/api/organizations/{org_id}/stations")
+async def assign_station(org_id: str, body: dict):
+    require_sb()
+    station_id = body.get("station_id")
+    if not station_id:
+        raise HTTPException(400, "station_id required")
+    sb.table("station_assignments").upsert({"organization_id": org_id, "station_id": station_id}).execute()
+    return {"ok": True}
+
+@app.delete("/api/organizations/{org_id}/stations/{station_id}")
+def unassign_station(org_id: str, station_id: str):
+    require_sb()
+    sb.table("station_assignments").delete().eq("organization_id", org_id).eq("station_id", station_id).execute()
+    return {"ok": True}
+
+# ── Users (Profiles) ──────────────────────────────────────────────────────────
+
+@app.get("/api/organizations/{org_id}/users")
+def get_org_users(org_id: str):
+    require_sb()
+    return sb.table("profiles").select("*").eq("org_id", org_id).order("created_at").execute().data or []
+
+@app.post("/api/organizations/{org_id}/users")
+async def invite_user(org_id: str, body: dict):
+    require_sb()
+    email = (body.get("email") or "").strip()
+    name  = (body.get("full_name") or "").strip()
+    role  = body.get("role", "viewer")
+    if not email:
+        raise HTTPException(400, "email is required")
+    temp_pass = _gen_temp_password()
+    try:
+        res = sb.auth.admin.create_user({
+            "email": email,
+            "password": temp_pass,
+            "email_confirm": True,
+            "user_metadata": {"full_name": name},
+        })
+        user_id = res.user.id
+    except Exception as e:
+        raise HTTPException(400, f"Failed to create auth user: {e}")
+    sb.table("profiles").upsert({
+        "id": user_id,
+        "org_id": org_id,
+        "full_name": name,
+        "email": email,
+        "role": role,
+        "is_active": True,
+    }).execute()
+    # Trigger password reset so user sets their own password
+    reset_url = None
+    try:
+        link = sb.auth.admin.generate_link({
+            "type": "recovery",
+            "email": email,
+            "options": {"redirect_to": os.getenv("FRONTEND_URL", "")},
+        })
+        reset_url = getattr(getattr(link, "properties", None), "action_link", None)
+    except Exception:
+        pass
+    return {"user_id": user_id, "email": email, "reset_url": reset_url, "temp_password": temp_pass}
+
+@app.put("/api/organizations/{org_id}/users/{user_id}")
+async def update_org_user(org_id: str, user_id: str, body: dict):
+    require_sb()
+    allowed = {"role", "is_active", "full_name", "phone"}
+    updates = {k: v for k, v in body.items() if k in allowed}
+    if updates:
+        sb.table("profiles").update(updates).eq("id", user_id).eq("org_id", org_id).execute()
+    return {"ok": True}
+
+@app.delete("/api/organizations/{org_id}/users/{user_id}")
+def deactivate_user(org_id: str, user_id: str):
+    require_sb()
+    sb.table("profiles").update({"is_active": False}).eq("id", user_id).eq("org_id", org_id).execute()
+    return {"ok": True}
+
+# ── Permissions ───────────────────────────────────────────────────────────────
+
+@app.get("/api/organizations/{org_id}/permissions")
+def get_org_permissions(org_id: str, station_id: Optional[str] = None):
+    require_sb()
+    q = sb.table("client_permissions").select("*").eq("organization_id", org_id)
+    if station_id:
+        q = q.eq("station_id", station_id)
+    return q.execute().data or []
+
+@app.put("/api/organizations/{org_id}/permissions")
+async def update_org_permissions(org_id: str, body: dict):
+    """
+    body: { station_id: str|null, permission_type: str, permission_value: dict }
+    """
+    require_sb()
+    rows = body if isinstance(body, list) else [body]
+    for row in rows:
+        sb.table("client_permissions").upsert({
+            "organization_id": org_id,
+            "station_id": row.get("station_id"),
+            "permission_type": row["permission_type"],
+            "permission_value": row["permission_value"],
+        }).execute()
+    return {"ok": True}
