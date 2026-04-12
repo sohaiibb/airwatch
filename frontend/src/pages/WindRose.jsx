@@ -76,6 +76,13 @@ export default function WindRose({ profile }) {
   const [loading, setLoading]     = useState(false);
   const [isDemo, setIsDemo]       = useState(false);
   const [hovered, setHovered]     = useState(null);
+  const [isMobile, setIsMobile]   = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const h = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', h);
+    return () => window.removeEventListener('resize', h);
+  }, []);
 
   useEffect(() => {
     getStations().then(st => {
@@ -105,8 +112,9 @@ export default function WindRose({ profile }) {
     load();
   }, [selIdx, stations, timeRange, isDemo]);
 
-  // Wind rose computation
-  const VB = 460, CX = 230, CY = 230, MAX_R = 165, LABEL_R = 195, GAP = 0.8;
+  // Wind rose computation — larger viewBox on mobile so labels don't clip
+  const VB = isMobile ? 500 : 460;
+  const CX = VB / 2, CY = VB / 2, MAX_R = 165, LABEL_R = isMobile ? 215 : 195, GAP = 0.8;
 
   const { sectors, calmCount, validCount, avgSpeed, maxSpeed } = useMemo(() => processWindRose(data), [data]);
   const sectorTotals = useMemo(() => sectors.map(s => s.reduce((a, b) => a + b, 0)), [sectors]);
@@ -186,11 +194,11 @@ export default function WindRose({ profile }) {
       </div>
 
       {/* Main content: rose + stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 16, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 280px', gap: 16, marginBottom: 16 }}>
 
         {/* Wind Rose SVG */}
-        <div style={{ ...glass({ padding: '24px', borderRadius: 18 }), animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.1s both', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div style={{ width: '100%', maxWidth: 480, position: 'relative' }}>
+        <div style={{ ...glass({ padding: isMobile ? '16px' : '24px', borderRadius: 18 }), animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.1s both', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div style={{ width: '100%', maxWidth: isMobile ? '100%' : 480, minHeight: isMobile ? 350 : undefined, position: 'relative' }}>
             <svg viewBox={`0 0 ${VB} ${VB}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
               {/* Reference rings */}
               {rings.map((ring, i) => (
@@ -245,7 +253,7 @@ export default function WindRose({ profile }) {
                 return (
                   <text key={dir} x={x} y={y}
                     textAnchor="middle" dominantBaseline="middle"
-                    fontSize={primary ? 13 : inter ? 10.5 : 9}
+                    fontSize={primary ? (isMobile ? 15 : 13) : inter ? (isMobile ? 12 : 10.5) : (isMobile ? 10 : 9)}
                     fontWeight={primary ? 700 : inter ? 600 : 400}
                     fill={hovered === i ? '#16A34A' : primary ? '#1C1917' : '#78716C'}
                     fontFamily="'Instrument Sans',sans-serif"
