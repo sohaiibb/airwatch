@@ -425,23 +425,23 @@ function exportPDF(rows, readings, station, fromISO, toISO, generatedAt, activeC
   if (needsNewPage) doc.addPage();
   const sY = needsNewPage ? MT : statsY;
 
-  doc.setFontSize(9);
+  // "Statistical Analysis" label — flush against the data table
+  doc.setFontSize(7.5);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...BLACK);
-  doc.text('Statistical Analysis', ML, sY);
+  doc.setTextColor(...TEAL_RGB);
+  doc.text('Statistical Analysis  (based on all raw readings)', ML, sY);
 
-  const statFirstColW = 18;
-  const statDataColW  = Math.max(10, Math.floor((CW - statFirstColW) / activeCols.length));
-  const statsColStyles = { 0: { cellWidth: statFirstColW, fontStyle: 'bold', halign: 'left' } };
-  activeCols.forEach((_, i) => { statsColStyles[i + 1] = { cellWidth: statDataColW, halign: 'right' }; });
+  // Use IDENTICAL column widths as the data table above
+  const statsColStyles = { 0: { cellWidth: dateColWidth, fontStyle: 'bold', halign: 'left' } };
+  activeCols.forEach((_, i) => { statsColStyles[i + 1] = { cellWidth: dataColWidth, halign: 'right' }; });
 
   doc.autoTable({
     head:      statsHead,
     body:      statsBody,
-    startY:    sY + 4,
+    startY:    sY + 3,
     margin:    { left: ML, right: MR, bottom: 14 },
     tableWidth: CW,
-    styles:          { fontSize: 7, cellPadding: 2.2, textColor: [...BLACK] },
+    styles:          { fontSize: 7, cellPadding: 1.8, textColor: [...BLACK] },
     headStyles:      { fillColor: TEAL_RGB, textColor: [255,255,255], fontStyle: 'bold', fontSize: 7, halign: 'center' },
     columnStyles:    statsColStyles,
     alternateRowStyles: { fillColor: [240, 253, 250] },
@@ -550,74 +550,83 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt, avgPeriod,
         ))}
       </div>
 
-      {/* ── 3. Data Table ── */}
-      <div style={{ marginBottom: 24 }}>
-        <h3 style={{ fontSize: 12, fontWeight: 700, margin: '0 0 10px', color: '#1C1917', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ width: 4, height: 13, background: TEAL, borderRadius: 2, display: 'inline-block' }} />
-          {avgPeriodTitle(avgPeriod)}
-          <span style={{ fontSize: 10, fontWeight: 400, color: '#78716C' }}>({tableRows.length} {avgPeriodUnit(avgPeriod)})</span>
-        </h3>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 400 }}>
-            <thead>
-              <tr>
-                <th style={{ ...thStyle, minWidth: 140 }}>Date / Time</th>
-                {activeCols.map(c => (
-                  <th key={c.key} style={{ ...thStyle, textAlign: 'right', minWidth: 68 }}>
-                    {c.label}<br />
-                    <span style={{ fontSize: 9, fontWeight: 400, opacity: 0.85 }}>{c.unit}</span>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {tableRows.length === 0 ? (
-                <tr>
-                  <td colSpan={activeCols.length + 1} style={{ ...tdStyle(0), textAlign: 'center', padding: '28px', color: '#A8A29E' }}>
-                    No data for this period
-                  </td>
-                </tr>
-              ) : tableRows.map((r, i) => (
-                <tr key={i}>
-                  <td style={{ ...tdStyle(i), fontWeight: 500, whiteSpace: 'nowrap', color: '#374151' }}>
-                    {fmtRowLabel(r.timestamp, avgPeriod)}
-                  </td>
-                  {activeCols.map(c => (
-                    <td key={c.key} style={{ ...tdStyle(i), textAlign: 'right' }}>
-                      {fmt(r[c.key], c.dp)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* ── 3 + 4. Data Table + Statistical Analysis (shared scroll, matched columns) ── */}
+      {(() => {
+        const statsPerCol = activeCols.map(c => ({ c, s: calcStats(readings, c.key) }));
+        const statRows = [
+          { label: 'Mean',    fn: ({ c, s }) => fmt(s.mean, c.dp) },
+          { label: 'Min',     fn: ({ c, s }) => fmt(s.min,  c.dp) },
+          { label: 'Max',     fn: ({ c, s }) => fmt(s.max,  c.dp) },
+          { label: 'Std Dev', fn: ({ c, s }) => fmt(s.sd,   c.dp) },
+          { label: 'P98',     fn: ({ c, s }) => fmt(s.p98,  c.dp) },
+        ];
+        // Shared colgroup: first col fixed width, rest equal
+        const colGroup = (
+          <colgroup>
+            <col style={{ width: 140 }} />
+            {activeCols.map(c => <col key={c.key} />)}
+          </colgroup>
+        );
+        return (
+          <div style={{ marginBottom: 24 }}>
+            <h3 style={{ fontSize: 12, fontWeight: 700, margin: '0 0 8px', color: '#1C1917', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ width: 4, height: 13, background: TEAL, borderRadius: 2, display: 'inline-block' }} />
+              {avgPeriodTitle(avgPeriod)}
+              <span style={{ fontSize: 10, fontWeight: 400, color: '#78716C' }}>({tableRows.length} {avgPeriodUnit(avgPeriod)})</span>
+            </h3>
 
-      {/* ── 4. Statistical Analysis ── */}
-      <div className="pb" style={{ marginBottom: 24 }}>
-        <h3 style={{ fontSize: 12, fontWeight: 700, margin: '0 0 10px', color: '#1C1917', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ width: 4, height: 13, background: TEAL, borderRadius: 2, display: 'inline-block' }} />
-          Statistical Analysis
-          <span style={{ fontSize: 10, fontWeight: 400, color: '#78716C' }}>(based on all raw readings)</span>
-        </h3>
-        {(() => {
-          const statsPerCol = activeCols.map(c => ({ c, s: calcStats(readings, c.key) }));
-          const statRows = [
-            { label: 'Mean',    fn: ({ c, s }) => fmt(s.mean, c.dp) },
-            { label: 'Min',     fn: ({ c, s }) => fmt(s.min,  c.dp) },
-            { label: 'Max',     fn: ({ c, s }) => fmt(s.max,  c.dp) },
-            { label: 'Std Dev', fn: ({ c, s }) => fmt(s.sd,   c.dp) },
-            { label: 'P98',     fn: ({ c, s }) => fmt(s.p98,  c.dp) },
-          ];
-          return (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 400 }}>
+            <div className="pb" style={{ overflowX: 'auto' }}>
+              {/* Data rows table */}
+              <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', minWidth: 500 }}>
+                {colGroup}
                 <thead>
                   <tr>
-                    <th style={{ ...thStyle, minWidth: 72 }}>Statistic</th>
+                    <th style={{ ...thStyle, width: 140 }}>Date / Time</th>
                     {activeCols.map(c => (
-                      <th key={c.key} style={{ ...thStyle, textAlign: 'right', minWidth: 68 }}>
+                      <th key={c.key} style={{ ...thStyle, textAlign: 'right' }}>
+                        {c.label}<br />
+                        <span style={{ fontSize: 9, fontWeight: 400, opacity: 0.85 }}>{c.unit}</span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {tableRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={activeCols.length + 1} style={{ ...tdStyle(0), textAlign: 'center', padding: '28px', color: '#A8A29E' }}>
+                        No data for this period
+                      </td>
+                    </tr>
+                  ) : tableRows.map((r, i) => (
+                    <tr key={i}>
+                      <td style={{ ...tdStyle(i), fontWeight: 500, whiteSpace: 'nowrap', color: '#374151' }}>
+                        {fmtRowLabel(r.timestamp, avgPeriod)}
+                      </td>
+                      {activeCols.map(c => (
+                        <td key={c.key} style={{ ...tdStyle(i), textAlign: 'right' }}>
+                          {fmt(r[c.key], c.dp)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* Divider label */}
+              <div style={{ padding: '5px 9px', background: TEAL_SOFT, borderTop: `2px solid ${TEAL}`, borderBottom: `1px solid ${TEAL_MID}`, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 3, height: 10, background: TEAL, borderRadius: 2, display: 'inline-block' }} />
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#1C1917' }}>Statistical Analysis</span>
+                <span style={{ fontSize: 10, color: '#78716C' }}>(based on all raw readings)</span>
+              </div>
+
+              {/* Stats table — same colgroup = perfectly aligned columns */}
+              <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
+                {colGroup}
+                <thead>
+                  <tr>
+                    <th style={{ ...thStyle, width: 140 }}>Statistic</th>
+                    {activeCols.map(c => (
+                      <th key={c.key} style={{ ...thStyle, textAlign: 'right' }}>
                         {c.label}<br />
                         <span style={{ fontSize: 9, fontWeight: 400, opacity: 0.85 }}>{c.unit}</span>
                       </th>
@@ -638,9 +647,9 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt, avgPeriod,
                 </tbody>
               </table>
             </div>
-          );
-        })()}
-      </div>
+          </div>
+        );
+      })()}
 
       {/* ── 5. Footer ── */}
       <div style={{ borderTop: `1px solid #e5e7eb`, paddingTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
