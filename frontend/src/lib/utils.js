@@ -8,14 +8,41 @@ export const AQI_LEVELS = [
 ];
 export const getAqiLevel = (v) => AQI_LEVELS.find(l => v >= l.min && v <= l.max) || AQI_LEVELS[0];
 
-export const NCEC_DEFAULTS = {
-  pm25: { label: 'PM2.5', unit: 'µg/m³', threshold_24h: 35, color: '#3B82F6' },
-  pm10: { label: 'PM10', unit: 'µg/m³', threshold_24h: 340, color: '#8B5CF6' },
-  so2:  { label: 'SO₂',  unit: 'µg/m³', threshold_1h: 350, color: '#F59E0B' },
-  no2:  { label: 'NO₂',  unit: 'µg/m³', threshold_1h: 200, color: '#06B6D4' },
-  o3:   { label: 'O₃',   unit: 'µg/m³', threshold_1h: 200, color: '#EC4899' },
-  co:   { label: 'CO',   unit: 'µg/m³', threshold_1h: 40000, color: '#10B981' },
+export const NCEC_STANDARDS = {
+  co: { label: 'CO', unit: 'µg/m³', color: '#10B981', standards: [
+    { period: '1-hour',  limit: 40000, exceedances: '1X per year' },
+    { period: '8-hour',  limit: 10000, exceedances: '2X per month' },
+  ]},
+  no2: { label: 'NO₂', unit: 'µg/m³', color: '#06B6D4', standards: [
+    { period: '1-hour',  limit: 200,   exceedances: '24X per year' },
+    { period: '1-year',  limit: 100,   exceedances: null },
+  ]},
+  so2: { label: 'SO₂', unit: 'µg/m³', color: '#F59E0B', standards: [
+    { period: '1-hour',  limit: 441,   exceedances: '24X per year' },
+    { period: '24-hour', limit: 217,   exceedances: '3X per year' },
+    { period: '1-year',  limit: 65,    exceedances: null },
+  ]},
+  o3: { label: 'O₃', unit: 'µg/m³', color: '#EC4899', standards: [
+    { period: '8-hour',  limit: 157,   exceedances: '25 days/year avg over 3 years' },
+  ]},
+  pm10: { label: 'PM₁₀', unit: 'µg/m³', color: '#8B5CF6', standards: [
+    { period: '24-hour', limit: 340,   exceedances: '12X per year' },
+    { period: '1-year',  limit: 50,    exceedances: null },
+  ]},
+  pm25: { label: 'PM₂.₅', unit: 'µg/m³', color: '#3B82F6', standards: [
+    { period: '24-hour', limit: 35,    exceedances: '12X per year' },
+    { period: '1-year',  limit: 15,    exceedances: null },
+  ]},
 };
+
+export function getApplicableStandard(pollutantKey, dataPeriod) {
+  const pollutant = NCEC_STANDARDS[pollutantKey];
+  if (!pollutant) return null;
+  const period = dataPeriod === 'annual' ? '1-year' : dataPeriod;
+  const standard = pollutant.standards.find(s => s.period === period);
+  if (!standard) return null;
+  return { ...standard, label: pollutant.label, unit: pollutant.unit, color: pollutant.color };
+}
 
 export const glass = (x = {}) => ({ background:'rgba(255,255,255,0.42)', backdropFilter:'blur(24px) saturate(1.6)', WebkitBackdropFilter:'blur(24px) saturate(1.6)', borderRadius:22, border:'1px solid rgba(255,255,255,0.55)', boxShadow:'0 2px 32px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.7), inset 0 -1px 0 rgba(255,255,255,0.15)', ...x });
 export const glassInner = (x = {}) => ({ background:'rgba(255,255,255,0.30)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', borderRadius:14, border:'1px solid rgba(255,255,255,0.45)', ...x });
@@ -23,9 +50,9 @@ export const glassInner = (x = {}) => ({ background:'rgba(255,255,255,0.30)', ba
 export const POLLUTANTS = [
   { key: 'pm25', name: 'PM2.5', unit: 'µg/m³', color: '#3B82F6', threshold: 35, max: 150 },
   { key: 'pm10', name: 'PM10', unit: 'µg/m³', color: '#8B5CF6', threshold: 340, max: 600 },
-  { key: 'so2',  name: 'SO₂',  unit: 'µg/m³', color: '#F59E0B', threshold: 350, max: 500 },
+  { key: 'so2',  name: 'SO₂',  unit: 'µg/m³', color: '#F59E0B', threshold: 441, max: 500 },
   { key: 'no2',  name: 'NO₂',  unit: 'µg/m³', color: '#06B6D4', threshold: 200, max: 300 },
-  { key: 'o3',   name: 'O₃',   unit: 'µg/m³', color: '#EC4899', threshold: 200, max: 300 },
+  { key: 'o3',   name: 'O₃',   unit: 'µg/m³', color: '#EC4899', threshold: 157, max: 300 },
   { key: 'co',   name: 'CO',   unit: 'µg/m³', color: '#10B981', threshold: 40000, max: 60000 },
 ];
 

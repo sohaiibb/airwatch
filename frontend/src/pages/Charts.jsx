@@ -14,9 +14,9 @@ const PAGE_SIZE = 20;
 const CELL_THRESHOLDS = {
   pm25: { yellow: 35,  red: 55 },
   pm10: { yellow: 250, red: 340 },
-  so2:  { red: 350 },
+  so2:  { red: 441 },
   no2:  { red: 200 },
-  o3:   { red: 200 },
+  o3:   { red: 157 },
   co:   { red: 40000 },
 };
 function cellColor(key, value) {
