@@ -29,6 +29,19 @@ const COLS = [
   { key: 'wind_direction',label: 'WD',      pdfLabel: 'WD',    unit: '°',     dp: 0 },
 ];
 
+const PARAM_GROUPS = [
+  { label: 'Air Quality',    keys: ['pm25', 'pm10', 'so2', 'no2', 'o3', 'co'] },
+  { label: 'Meteorological', keys: ['temperature', 'humidity', 'wind_speed', 'wind_direction'] },
+];
+
+const AVG_PERIODS = [
+  { id: '1min',  label: '1-Min'  },
+  { id: '15min', label: '15-Min' },
+  { id: '1hour', label: '1-Hour' },
+  { id: '8hour', label: '8-Hour' },
+  { id: '24hour', label: '24-Hour' },
+];
+
 function fmt(v, dp = 1) {
   if (v == null || isNaN(Number(v))) return '—';
   return Number(v).toFixed(dp);
@@ -55,8 +68,85 @@ function fmtDayLabel(isoStr) {
     day: '2-digit', month: 'short', year: 'numeric',
   });
 }
+function fmtRowLabel(ts, avgPeriod) {
+  return avgPeriod === '24hour' ? fmtDayLabel(ts) : fmtHourLabel(ts);
+}
 
-// ── Hourly aggregation ───────────────────────────────────────────────────────
+function avgPeriodLabel(period) {
+  switch (period) {
+    case '1min':  return '1-minute averages';
+    case '15min': return '15-minute averages';
+    case '8hour': return '8-hour averages';
+    case '24hour': return 'Daily averages';
+    default:       return 'Hourly averages';
+  }
+}
+function avgPeriodTitle(period) {
+  switch (period) {
+    case '1min':  return '1-Minute Averaged Data';
+    case '15min': return '15-Minute Averaged Data';
+    case '8hour': return '8-Hour Averaged Data';
+    case '24hour': return 'Daily Averaged Data';
+    default:       return 'Hourly Averaged Data';
+  }
+}
+function avgPeriodUnit(period) {
+  switch (period) {
+    case '1min':  return 'min. intervals';
+    case '15min': return '15-min intervals';
+    case '8hour': return '8-hr periods';
+    case '24hour': return 'days';
+    default:       return 'hours';
+  }
+}
+function calcExpected(spanHours, avgPeriod) {
+  switch (avgPeriod) {
+    case '1min':  return Math.max(1, Math.round(spanHours * 60));
+    case '15min': return Math.max(1, Math.round(spanHours * 4));
+    case '8hour': return Math.max(1, Math.round(spanHours / 8));
+    case '24hour': return Math.max(1, Math.round(spanHours / 24));
+    default:       return Math.max(1, Math.round(spanHours));
+  }
+}
+
+// ── Aggregation ───────────────────────────────────────────────────────────────
+function avgBucket(recs) {
+  const row = {};
+  COLS.forEach(c => {
+    const vals = recs.map(r => r[c.key]).filter(v => v != null && !isNaN(Number(v))).map(Number);
+    row[c.key] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  });
+  return row;
+}
+
+function build1MinRows(readings) {
+  const buckets = {};
+  readings.forEach(r => {
+    const d = new Date(r.timestamp);
+    d.setSeconds(0, 0);
+    const key = d.toISOString();
+    if (!buckets[key]) buckets[key] = [];
+    buckets[key].push(r);
+  });
+  return Object.entries(buckets)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([iso, recs]) => ({ timestamp: iso, ...avgBucket(recs) }));
+}
+
+function build15MinRows(readings) {
+  const buckets = {};
+  readings.forEach(r => {
+    const d = new Date(r.timestamp);
+    d.setMinutes(Math.floor(d.getMinutes() / 15) * 15, 0, 0);
+    const key = d.toISOString();
+    if (!buckets[key]) buckets[key] = [];
+    buckets[key].push(r);
+  });
+  return Object.entries(buckets)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([iso, recs]) => ({ timestamp: iso, ...avgBucket(recs) }));
+}
+
 function buildHourlyRows(readings) {
   const buckets = {};
   readings.forEach(r => {
@@ -68,17 +158,23 @@ function buildHourlyRows(readings) {
   });
   return Object.entries(buckets)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([iso, recs]) => {
-      const row = { timestamp: iso };
-      COLS.forEach(c => {
-        const vals = recs.map(r => r[c.key]).filter(v => v != null && !isNaN(Number(v))).map(Number);
-        row[c.key] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
-      });
-      return row;
-    });
+    .map(([iso, recs]) => ({ timestamp: iso, ...avgBucket(recs) }));
 }
 
-// ── Daily aggregation ────────────────────────────────────────────────────────
+function build8HourRows(readings) {
+  const buckets = {};
+  readings.forEach(r => {
+    const d = new Date(r.timestamp);
+    d.setHours(Math.floor(d.getHours() / 8) * 8, 0, 0, 0);
+    const key = d.toISOString();
+    if (!buckets[key]) buckets[key] = [];
+    buckets[key].push(r);
+  });
+  return Object.entries(buckets)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([iso, recs]) => ({ timestamp: iso, ...avgBucket(recs) }));
+}
+
 function buildDailyRows(readings) {
   const buckets = {};
   readings.forEach(r => {
@@ -88,14 +184,17 @@ function buildDailyRows(readings) {
   });
   return Object.entries(buckets)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([day, recs]) => {
-      const row = { timestamp: day + 'T00:00:00.000Z' };
-      COLS.forEach(c => {
-        const vals = recs.map(r => r[c.key]).filter(v => v != null && !isNaN(Number(v))).map(Number);
-        row[c.key] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
-      });
-      return row;
-    });
+    .map(([day, recs]) => ({ timestamp: day + 'T00:00:00.000Z', ...avgBucket(recs) }));
+}
+
+function buildRows(readings, avgPeriod) {
+  switch (avgPeriod) {
+    case '1min':   return build1MinRows(readings);
+    case '15min':  return build15MinRows(readings);
+    case '8hour':  return build8HourRows(readings);
+    case '24hour': return buildDailyRows(readings);
+    default:       return buildHourlyRows(readings);
+  }
 }
 
 // ── Statistical analysis ──────────────────────────────────────────────────────
@@ -138,12 +237,13 @@ function toLocalInput(d) {
 }
 
 // ── CSV export ────────────────────────────────────────────────────────────────
-function exportCSV(rows, stationName, fromStr, toStr, isDaily) {
-  const headers = ['Date/Time', ...COLS.map(c => `${c.label} (${c.unit})`)];
+function exportCSV(rows, stationName, fromStr, toStr, activeCols, avgPeriod) {
+  const daily   = avgPeriod === '24hour';
+  const headers = ['Date/Time', ...activeCols.map(c => `${c.label} (${c.unit})`)];
   const lines   = [headers.join(',')];
   rows.forEach(r => {
-    const label = isDaily ? fmtDayLabel(r.timestamp) : fmtHourLabel(r.timestamp);
-    const vals  = COLS.map(c => r[c.key] != null ? Number(r[c.key]).toFixed(c.dp) : '');
+    const label = daily ? fmtDayLabel(r.timestamp) : fmtHourLabel(r.timestamp);
+    const vals  = activeCols.map(c => r[c.key] != null ? Number(r[c.key]).toFixed(c.dp) : '');
     lines.push([`"${label}"`, ...vals].join(','));
   });
   const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
@@ -154,30 +254,32 @@ function exportCSV(rows, stationName, fromStr, toStr, isDaily) {
 }
 
 // ── Excel export ──────────────────────────────────────────────────────────────
-function exportExcel(rows, stationName, fromStr, toStr, isDaily) {
-  const headers = ['Date/Time', ...COLS.map(c => `${c.label} (${c.unit})`)];
+function exportExcel(rows, stationName, fromStr, toStr, activeCols, avgPeriod) {
+  const daily   = avgPeriod === '24hour';
+  const headers = ['Date/Time', ...activeCols.map(c => `${c.label} (${c.unit})`)];
   const data    = rows.map(r => {
-    const label = isDaily ? fmtDayLabel(r.timestamp) : fmtHourLabel(r.timestamp);
-    return [label, ...COLS.map(c => r[c.key] != null ? +Number(r[c.key]).toFixed(c.dp) : null)];
+    const label = daily ? fmtDayLabel(r.timestamp) : fmtHourLabel(r.timestamp);
+    return [label, ...activeCols.map(c => r[c.key] != null ? +Number(r[c.key]).toFixed(c.dp) : null)];
   });
   const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
-  ws['!cols'] = [{ wch: 22 }, ...COLS.map(() => ({ wch: 10 }))];
+  ws['!cols'] = [{ wch: 22 }, ...activeCols.map(() => ({ wch: 10 }))];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Data');
   XLSX.writeFile(wb, `${stationName.replace(/\s+/g,'_')}_${fromStr}_${toStr}.xlsx`);
 }
 
 // ── PDF export (jsPDF + autoTable) ───────────────────────────────────────────
-function exportPDF(rows, readings, station, fromISO, toISO, generatedAt, isDaily) {
+function exportPDF(rows, readings, station, fromISO, toISO, generatedAt, activeCols, avgPeriod) {
   const stationName = station.name || 'Unknown';
-  const doc      = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const PW       = doc.internal.pageSize.getWidth();
-  const PH       = doc.internal.pageSize.getHeight();
+  const daily     = avgPeriod === '24hour';
+  const doc       = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const PW        = doc.internal.pageSize.getWidth();
+  const PH        = doc.internal.pageSize.getHeight();
   const ML = 15, MR = 15, MT = 15;
-  const CW       = PW - ML - MR;
-  const TEAL_RGB = [13, 148, 136];
-  const GRAY     = [100, 100, 100];
-  const BLACK    = [28, 25, 23];
+  const CW        = PW - ML - MR;
+  const TEAL_RGB  = [13, 148, 136];
+  const GRAY      = [100, 100, 100];
+  const BLACK     = [28, 25, 23];
 
   const fromStr = fromISO.slice(0, 10);
   const toStr   = toISO.slice(0, 10);
@@ -199,13 +301,11 @@ function exportPDF(rows, readings, station, fromISO, toISO, generatedAt, isDaily
   // ── Page 1 header ─────────────────────────────────────────────────────────
   let y = MT;
 
-  // Report title (left)
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...BLACK);
   doc.text('Air Quality Monitoring Report', ML, y);
 
-  // Generated block — right-aligned
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...GRAY);
@@ -220,14 +320,12 @@ function exportPDF(rows, readings, station, fromISO, toISO, generatedAt, isDaily
 
   y += 6;
 
-  // Station
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...BLACK);
   doc.text(`Station: ${stationName}`, ML, y);
   y += 5;
 
-  // Coordinates (if available)
   if (station.latitude != null && station.longitude != null) {
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
@@ -236,30 +334,27 @@ function exportPDF(rows, readings, station, fromISO, toISO, generatedAt, isDaily
     y += 5;
   }
 
-  // Period
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...GRAY);
   doc.text(`Period: ${fmtDT(fromISO)}  —  ${fmtDT(toISO)}`, ML, y);
   y += 6;
 
-  // Teal separator line
   doc.setDrawColor(...TEAL_RGB);
   doc.setLineWidth(0.6);
   doc.line(ML, y, PW - MR, y);
   y += 5;
 
   // ── Summary line ──────────────────────────────────────────────────────────
-  const spanHours  = (new Date(toISO) - new Date(fromISO)) / 3600000;
-  const expected   = isDaily ? Math.max(1, Math.round(spanHours / 24)) : Math.max(1, Math.round(spanHours));
-  const capPct     = Math.min(100, Math.round((rows.length / expected) * 100));
-  const avgLabel   = isDaily ? 'Daily averages' : 'Hourly averages';
+  const spanHours = (new Date(toISO) - new Date(fromISO)) / 3600000;
+  const expected  = calcExpected(spanHours, avgPeriod);
+  const capPct    = Math.min(100, Math.round((rows.length / expected) * 100));
 
   doc.setFontSize(8);
   doc.setTextColor(...GRAY);
   doc.setFont('helvetica', 'normal');
   doc.text(
-    `Data Points: ${readings.length}   |   Period: ${rows.length} ${isDaily ? 'days' : 'hours'}   |   Data Capture: ${capPct}%   |   Averaging: ${avgLabel}`,
+    `Data Points: ${readings.length}   |   Period: ${rows.length} ${avgPeriodUnit(avgPeriod)}   |   Data Capture: ${capPct}%   |   Averaging: ${avgPeriodLabel(avgPeriod)}`,
     ML, y
   );
   y += 7;
@@ -268,13 +363,18 @@ function exportPDF(rows, readings, station, fromISO, toISO, generatedAt, isDaily
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...BLACK);
-  doc.text(isDaily ? 'Daily Averaged Data' : 'Hourly Averaged Data', ML, y);
+  doc.text(avgPeriodTitle(avgPeriod), ML, y);
   y += 4;
 
-  const dataHead = [['Date / Time', 'PM2.5\nug/m3', 'PM10\nug/m3', 'SO2\nug/m3', 'NO2\nug/m3', 'O3\nug/m3', 'CO\nug/m3', 'Temp\n°C', 'RH\n%', 'WS\nm/s', 'WD\n°']];
+  const dateColWidth = daily ? 26 : 38;
+  const dataColWidth = Math.max(10, Math.floor((CW - dateColWidth) / activeCols.length));
+  const colStylesDyn = { 0: { cellWidth: dateColWidth, halign: 'left' } };
+  activeCols.forEach((_, i) => { colStylesDyn[i + 1] = { cellWidth: dataColWidth, halign: 'right' }; });
+
+  const dataHead = [['Date / Time', ...activeCols.map(c => `${c.pdfLabel}\n${c.unit}`)]];
   const dataBody = rows.map(r => [
-    isDaily ? fmtDayLabel(r.timestamp) : fmtHourLabel(r.timestamp),
-    ...COLS.map(c => r[c.key] != null ? Number(r[c.key]).toFixed(c.dp) : '—'),
+    fmtRowLabel(r.timestamp, avgPeriod),
+    ...activeCols.map(c => r[c.key] != null ? Number(r[c.key]).toFixed(c.dp) : '—'),
   ]);
 
   doc.autoTable({
@@ -285,19 +385,7 @@ function exportPDF(rows, readings, station, fromISO, toISO, generatedAt, isDaily
     tableWidth: CW,
     styles:          { fontSize: 7, cellPadding: 1.8, overflow: 'linebreak', valign: 'middle', textColor: [...BLACK] },
     headStyles:      { fillColor: TEAL_RGB, textColor: [255,255,255], fontStyle: 'bold', fontSize: 7, halign: 'center' },
-    columnStyles:    {
-      0: { cellWidth: 32, halign: 'left' },
-      1: { cellWidth: 16, halign: 'right' },
-      2: { cellWidth: 16, halign: 'right' },
-      3: { cellWidth: 14, halign: 'right' },
-      4: { cellWidth: 14, halign: 'right' },
-      5: { cellWidth: 14, halign: 'right' },
-      6: { cellWidth: 18, halign: 'right' },
-      7: { cellWidth: 14, halign: 'right' },
-      8: { cellWidth: 12, halign: 'right' },
-      9: { cellWidth: 12, halign: 'right' },
-      10:{ cellWidth: 10, halign: 'right' },
-    },
+    columnStyles:    colStylesDyn,
     alternateRowStyles: { fillColor: [240, 253, 250] },
     didDrawPage: (data) => {
       if (data.pageNumber > 1) {
@@ -310,7 +398,7 @@ function exportPDF(rows, readings, station, fromISO, toISO, generatedAt, isDaily
   // ── Statistical Analysis table ────────────────────────────────────────────
   const statsY = doc.lastAutoTable.finalY + 10;
   const statsCols = ['Parameter', 'Unit', 'N', 'Mean', 'Min', 'Max', 'Std Dev', 'P98'];
-  const statsBody = COLS.map(c => {
+  const statsBody = activeCols.map(c => {
     const vals = readings.map(r => r[c.key]).filter(v => v != null && !isNaN(Number(v))).map(Number);
     if (!vals.length) return [c.pdfLabel, c.unit, '0', '—', '—', '—', '—', '—'];
     const sorted = [...vals].sort((a, b) => a - b);
@@ -359,7 +447,7 @@ function exportPDF(rows, readings, station, fromISO, toISO, generatedAt, isDaily
 // ReportView — clean white, printable
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ReportView({ station, fromISO, toISO, readings, generatedAt }) {
+function ReportView({ station, fromISO, toISO, readings, generatedAt, avgPeriod, activeCols }) {
   const printStyleRef = useRef(null);
 
   useEffect(() => {
@@ -383,13 +471,10 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt }) {
     return () => { if (printStyleRef.current) printStyleRef.current.remove(); };
   }, []);
 
-  const spanHours  = (new Date(toISO) - new Date(fromISO)) / 3600000;
-  const isDaily    = spanHours > 7 * 24;
-  const tableRows  = isDaily ? buildDailyRows(readings) : buildHourlyRows(readings);
-  const expected   = isDaily
-    ? Math.max(1, Math.round(spanHours / 24))
-    : Math.max(1, Math.round(spanHours));
-  const capPct     = Math.min(100, Math.round((tableRows.length / expected) * 100));
+  const spanHours = (new Date(toISO) - new Date(fromISO)) / 3600000;
+  const tableRows = buildRows(readings, avgPeriod);
+  const expected  = calcExpected(spanHours, avgPeriod);
+  const capPct    = Math.min(100, Math.round((tableRows.length / expected) * 100));
 
   const thStyle = {
     padding: '7px 9px',
@@ -442,12 +527,12 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt }) {
       </div>
 
       {/* ── 2. Summary Row ── */}
-      <div style={{ display: 'flex', gap: 24, marginBottom: 18, padding: '10px 14px', background: TEAL_SOFT, border: `1px solid ${TEAL_MID}`, borderRadius: 8 }}>
+      <div style={{ display: 'flex', gap: 24, marginBottom: 18, padding: '10px 14px', background: TEAL_SOFT, border: `1px solid ${TEAL_MID}`, borderRadius: 8, flexWrap: 'wrap' }}>
         {[
           { label: 'Data Points',   value: readings.length },
-          { label: isDaily ? 'Period (days)' : 'Period (hours)', value: `${tableRows.length} ${isDaily ? 'days' : 'hours'}` },
+          { label: `Period (${avgPeriodUnit(avgPeriod)})`, value: tableRows.length },
           { label: 'Data Capture',  value: `${capPct}%` },
-          { label: 'Averaging',     value: isDaily ? 'Daily averages' : 'Hourly averages' },
+          { label: 'Averaging',     value: avgPeriodLabel(avgPeriod) },
         ].map((s, i) => (
           <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <span style={{ fontSize: 11, color: '#57534E' }}>{s.label}:</span>
@@ -461,15 +546,15 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt }) {
       <div style={{ marginBottom: 24 }}>
         <h3 style={{ fontSize: 12, fontWeight: 700, margin: '0 0 10px', color: '#1C1917', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ width: 4, height: 13, background: TEAL, borderRadius: 2, display: 'inline-block' }} />
-          {isDaily ? 'Daily Averaged Data' : 'Hourly Averaged Data'}
-          <span style={{ fontSize: 10, fontWeight: 400, color: '#78716C' }}>({tableRows.length} {isDaily ? 'days' : 'hours'})</span>
+          {avgPeriodTitle(avgPeriod)}
+          <span style={{ fontSize: 10, fontWeight: 400, color: '#78716C' }}>({tableRows.length} {avgPeriodUnit(avgPeriod)})</span>
         </h3>
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 400 }}>
             <thead>
               <tr>
                 <th style={{ ...thStyle, minWidth: 140 }}>Date / Time</th>
-                {COLS.map(c => (
+                {activeCols.map(c => (
                   <th key={c.key} style={{ ...thStyle, textAlign: 'right', minWidth: 68 }}>
                     {c.label}<br />
                     <span style={{ fontSize: 9, fontWeight: 400, opacity: 0.85 }}>{c.unit}</span>
@@ -480,16 +565,16 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt }) {
             <tbody>
               {tableRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COLS.length + 1} style={{ ...tdStyle(0), textAlign: 'center', padding: '28px', color: '#A8A29E' }}>
+                  <td colSpan={activeCols.length + 1} style={{ ...tdStyle(0), textAlign: 'center', padding: '28px', color: '#A8A29E' }}>
                     No data for this period
                   </td>
                 </tr>
               ) : tableRows.map((r, i) => (
                 <tr key={i}>
                   <td style={{ ...tdStyle(i), fontWeight: 500, whiteSpace: 'nowrap', color: '#374151' }}>
-                    {isDaily ? fmtDayLabel(r.timestamp) : fmtHourLabel(r.timestamp)}
+                    {fmtRowLabel(r.timestamp, avgPeriod)}
                   </td>
-                  {COLS.map(c => (
+                  {activeCols.map(c => (
                     <td key={c.key} style={{ ...tdStyle(i), textAlign: 'right' }}>
                       {fmt(r[c.key], c.dp)}
                     </td>
@@ -517,7 +602,7 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt }) {
             </tr>
           </thead>
           <tbody>
-            {COLS.map((c, i) => {
+            {activeCols.map((c, i) => {
               const s = calcStats(readings, c.key);
               return (
                 <tr key={c.key} style={{ background: i % 2 === 0 ? '#ffffff' : '#f9fafb' }}>
@@ -562,15 +647,17 @@ export default function Reports({ profile }) {
   const now     = new Date();
   const dayAgo  = new Date(now - 86400000);
 
-  const [stations,       setStations]      = useState([]);
-  const [stationId,      setStationId]     = useState('');
-  const [fromDT,         setFromDT]        = useState(toLocalInput(dayAgo));
-  const [toDT,           setToDT]          = useState(toLocalInput(now));
-  const [selectedPreset, setSelectedPreset] = useState(24);
-  const [loading,        setLoading]       = useState(false);
-  const [error,          setError]         = useState('');
-  const [report,         setReport]        = useState(null);
-  const [recentReports,  setRecentReports] = useState([]);
+  const [stations,        setStations]       = useState([]);
+  const [stationId,       setStationId]      = useState('');
+  const [fromDT,          setFromDT]         = useState(toLocalInput(dayAgo));
+  const [toDT,            setToDT]           = useState(toLocalInput(now));
+  const [selectedPreset,  setSelectedPreset] = useState(24);
+  const [avgPeriod,       setAvgPeriod]      = useState('1hour');
+  const [selectedParams,  setSelectedParams] = useState(new Set(COLS.map(c => c.key)));
+  const [loading,         setLoading]        = useState(false);
+  const [error,           setError]          = useState('');
+  const [report,          setReport]         = useState(null);
+  const [recentReports,   setRecentReports]  = useState([]);
 
   useEffect(() => {
     getStations().then(st => {
@@ -601,7 +688,6 @@ export default function Reports({ profile }) {
     setToDT(tStr);
     setFromDT(fStr);
     setSelectedPreset(hours);
-    // Auto-trigger preview with the computed values directly (bypasses stale state)
     triggerPreview(fStr, tStr);
   }
 
@@ -637,10 +723,12 @@ export default function Reports({ profile }) {
     const station = stations.find(s => s.id === stationId) || { name: 'Unknown' };
     const r = {
       station,
-      fromISO:     new Date(fromDTVal).toISOString(),
-      toISO:       new Date(toDTVal).toISOString(),
+      fromISO:      new Date(fromDTVal).toISOString(),
+      toISO:        new Date(toDTVal).toISOString(),
       readings,
-      generatedAt: new Date().toISOString(),
+      generatedAt:  new Date().toISOString(),
+      avgPeriod,
+      selectedParams: [...selectedParams],
     };
     setReport(r);
     saveHistory(station, readings.length);
@@ -658,22 +746,29 @@ export default function Reports({ profile }) {
     localStorage.setItem('aw_reports_v2', JSON.stringify(updated));
   }
 
+  function getExportContext() {
+    const curAvgPeriod = report?.avgPeriod || avgPeriod;
+    const curParams    = report ? new Set(report.selectedParams) : selectedParams;
+    const activeCols   = COLS.filter(c => curParams.has(c.key));
+    return { curAvgPeriod, activeCols };
+  }
+
   async function handleCSV() {
     const readings = report?.readings || await loadData(fromDT, toDT);
     if (!readings) return;
     const station  = stations.find(s => s.id === stationId) || { name: 'Unknown' };
-    const isDaily  = (new Date(toDT) - new Date(fromDT)) / 3600000 > 7 * 24;
-    const rows     = isDaily ? buildDailyRows(readings) : buildHourlyRows(readings);
-    exportCSV(rows, station.name, fromDT.slice(0, 10), toDT.slice(0, 10), isDaily);
+    const { curAvgPeriod, activeCols } = getExportContext();
+    const rows = buildRows(readings, curAvgPeriod);
+    exportCSV(rows, station.name, fromDT.slice(0, 10), toDT.slice(0, 10), activeCols, curAvgPeriod);
   }
 
   async function handleExcel() {
     const readings = report?.readings || await loadData(fromDT, toDT);
     if (!readings) return;
-    const station = stations.find(s => s.id === stationId) || { name: 'Unknown' };
-    const isDaily = (new Date(toDT) - new Date(fromDT)) / 3600000 > 7 * 24;
-    const rows    = isDaily ? buildDailyRows(readings) : buildHourlyRows(readings);
-    exportExcel(rows, station.name, fromDT.slice(0, 10), toDT.slice(0, 10), isDaily);
+    const station  = stations.find(s => s.id === stationId) || { name: 'Unknown' };
+    const { curAvgPeriod, activeCols } = getExportContext();
+    const rows = buildRows(readings, curAvgPeriod);
+    exportExcel(rows, station.name, fromDT.slice(0, 10), toDT.slice(0, 10), activeCols, curAvgPeriod);
   }
 
   async function handlePDF() {
@@ -682,11 +777,11 @@ export default function Reports({ profile }) {
     const station  = stations.find(s => s.id === stationId) || { name: 'Unknown' };
     const fromISO  = new Date(fromDT).toISOString();
     const toISO    = new Date(toDT).toISOString();
-    const isDaily  = (new Date(toDT) - new Date(fromDT)) / 3600000 > 7 * 24;
-    const rows     = isDaily ? buildDailyRows(readings) : buildHourlyRows(readings);
-    const genAt    = report?.generatedAt || new Date().toISOString();
+    const { curAvgPeriod, activeCols } = getExportContext();
+    const rows  = buildRows(readings, curAvgPeriod);
+    const genAt = report?.generatedAt || new Date().toISOString();
     try {
-      exportPDF(rows, readings, station, fromISO, toISO, genAt, isDaily);
+      exportPDF(rows, readings, station, fromISO, toISO, genAt, activeCols, curAvgPeriod);
     } catch (err) {
       console.error('PDF generation failed:', err);
       setError('PDF generation failed: ' + (err?.message || String(err)));
@@ -712,6 +807,18 @@ export default function Reports({ profile }) {
       ? { background: `linear-gradient(135deg, ${TEAL}, ${TEAL_DARK})`, color: '#fff', boxShadow: `0 2px 14px ${TEAL}40` }
       : { background: 'rgba(255,255,255,0.45)', color: '#1C1917', border: '1px solid rgba(255,255,255,0.6)' }),
   });
+  const pillBtn = (active) => ({
+    padding: '4px 12px', borderRadius: 7,
+    border: active ? `1px solid ${TEAL}` : '1px solid rgba(255,255,255,0.55)',
+    background: active ? TEAL : 'rgba(255,255,255,0.38)',
+    fontSize: 11, fontWeight: 600, cursor: 'pointer',
+    color: active ? '#fff' : '#44403C',
+    fontFamily: 'var(--font)', transition: 'all 0.15s',
+  });
+
+  const reportActiveCols = report
+    ? COLS.filter(c => new Set(report.selectedParams).has(c.key))
+    : COLS.filter(c => selectedParams.has(c.key));
 
   return (
     <div style={{ maxWidth: 1080, margin: '0 auto' }}>
@@ -731,26 +838,83 @@ export default function Reports({ profile }) {
         </h2>
 
         {/* Presets */}
-        <div style={{ display: 'flex', gap: 7, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: '#A8A29E', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Presets:</span>
+        <div style={{ display: 'flex', gap: 7, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: '#A8A29E', textTransform: 'uppercase', letterSpacing: '0.07em', minWidth: 56 }}>Presets:</span>
           {PRESETS.map(p => {
             const isActive = selectedPreset === p.hours;
             return (
-              <button key={p.hours} onClick={() => applyPreset(p.hours)} style={{
-                padding: '4px 12px', borderRadius: 7,
-                border: isActive ? `1px solid ${TEAL}` : '1px solid rgba(255,255,255,0.55)',
-                background: isActive ? TEAL : 'rgba(255,255,255,0.38)',
-                fontSize: 11, fontWeight: 600,
-                cursor: 'pointer',
-                color: isActive ? '#fff' : '#44403C',
-                fontFamily: 'var(--font)',
-                transition: 'all 0.15s',
-              }}
+              <button key={p.hours} onClick={() => applyPreset(p.hours)}
+                style={pillBtn(isActive)}
                 onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.6)'; }}
                 onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.38)'; }}
               >{p.label}</button>
             );
           })}
+        </div>
+
+        {/* Averaging period */}
+        <div style={{ display: 'flex', gap: 7, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: '#A8A29E', textTransform: 'uppercase', letterSpacing: '0.07em', minWidth: 56 }}>Averaging:</span>
+          {AVG_PERIODS.map(p => {
+            const isActive = avgPeriod === p.id;
+            return (
+              <button key={p.id} onClick={() => setAvgPeriod(p.id)}
+                style={pillBtn(isActive)}
+                onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.6)'; }}
+                onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.38)'; }}
+              >{p.label}</button>
+            );
+          })}
+        </div>
+
+        {/* Parameter selector */}
+        <div style={{ marginBottom: 16, padding: '12px 14px', background: 'rgba(255,255,255,0.28)', border: '1px solid rgba(255,255,255,0.48)', borderRadius: 10 }}>
+          <div style={{ display: 'flex', gap: 7, alignItems: 'center', marginBottom: 10 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#A8A29E', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Parameters:</span>
+          </div>
+          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+            {PARAM_GROUPS.map(group => (
+              <div key={group.label} style={{ flex: 1, minWidth: 200 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#57534E' }}>{group.label}</span>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={() => setSelectedParams(prev => new Set([...prev, ...group.keys]))}
+                      style={{ fontSize: 10, color: TEAL, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'var(--font)', fontWeight: 600 }}
+                    >Select All</button>
+                    <span style={{ color: '#D6D3D1', fontSize: 10 }}>·</span>
+                    <button
+                      onClick={() => setSelectedParams(prev => { const next = new Set(prev); group.keys.forEach(k => next.delete(k)); return next; })}
+                      style={{ fontSize: 10, color: '#78716C', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'var(--font)', fontWeight: 600 }}
+                    >Deselect All</button>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 18px' }}>
+                  {group.keys.map(key => {
+                    const col     = COLS.find(c => c.key === key);
+                    const checked = selectedParams.has(key);
+                    return (
+                      <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 11, color: '#44403C', fontFamily: 'var(--font)', userSelect: 'none' }}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={e => {
+                            setSelectedParams(prev => {
+                              const next = new Set(prev);
+                              e.target.checked ? next.add(key) : next.delete(key);
+                              return next;
+                            });
+                          }}
+                          style={{ accentColor: TEAL, cursor: 'pointer', width: 13, height: 13 }}
+                        />
+                        {col?.label}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Station + date-time inputs */}
@@ -878,6 +1042,8 @@ export default function Reports({ profile }) {
               toISO={report.toISO}
               readings={report.readings}
               generatedAt={report.generatedAt}
+              avgPeriod={report.avgPeriod}
+              activeCols={reportActiveCols}
             />
           </div>
         </div>
