@@ -169,6 +169,69 @@ class AlertEngine:
             "alerts": alerts_batch,
         })
 
+        # Send push notifications
+        try:
+            self._send_push(station_id, subject, alerts_batch[0] if alerts_batch else None)
+        except Exception as e:
+            print(f"[AlertEngine] Push error: {e}")
+
+    def _send_push(self, station_id: str, subject: str, alert: Optional[dict]):
+        """Send web push notifications to subscribed users."""
+        import os
+        vapid_private = os.getenv("VAPID_PRIVATE_KEY", "")
+        vapid_email   = os.getenv("VAPID_CONTACT_EMAIL", "mailto:admin@example.com")
+        if not vapid_private:
+            return  # VAPID not configured, skip push
+
+        try:
+            from pywebpush import webpush, WebPushException
+            import json as _json
+        except ImportError:
+            return  # pywebpush not installed
+
+        # Fetch all active push subscriptions
+        try:
+            res = self.sb.table("push_subscriptions").select("endpoint,p256dh,auth").execute()
+            subs = res.data or []
+        except Exception:
+            return
+
+        if not subs:
+            return
+
+        pollutant = alert.get("pollutant", "") if alert else ""
+        label = POLLUTANT_LABELS.get(pollutant, pollutant).upper()
+        measured = alert.get("measured", 0) if alert else 0
+        threshold = alert.get("threshold", 0) if alert else 0
+        status = alert.get("status", "triggered") if alert else "triggered"
+
+        if status == "cleared":
+            title = f"\u2705 {label} Normal"
+            body  = f"{label} returned to {measured:.1f} \u00b5g/m\u00b3"
+        else:
+            title = f"\u26a0\ufe0f {label} Exceedance"
+            body  = f"{label} reached {measured:.1f} \u00b5g/m\u00b3 (limit: {threshold})"
+
+        payload = _json.dumps({
+            "title": title,
+            "body": body,
+            "tag": f"exceedance-{pollutant}",
+        })
+
+        for sub in subs:
+            try:
+                webpush(
+                    subscription_info={
+                        "endpoint": sub["endpoint"],
+                        "keys": {"p256dh": sub["p256dh"], "auth": sub["auth"]},
+                    },
+                    data=payload,
+                    vapid_private_key=vapid_private,
+                    vapid_claims={"sub": vapid_email},
+                )
+            except Exception as e:
+                print(f"[Push] Failed for {sub.get('endpoint', '')[:40]}\u2026: {e}")
+
     def get_subscribers(self, station_id: str) -> list:
         try:
             res = (self.sb.table("alert_subscribers")

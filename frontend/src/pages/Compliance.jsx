@@ -3,6 +3,7 @@ import { Shield, CheckCircle, XCircle, AlertTriangle, Loader2, Info } from 'luci
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { supabase, getStations, getDemoStations, getDemoHistory } from '../lib/supabase';
 import { glass, glassInner, NCEC_STANDARDS, POLLUTANTS } from '../lib/utils';
+import ExceedanceCalendar from '../components/ExceedanceCalendar';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -106,7 +107,7 @@ const GlassTooltip = ({ active, payload, label }) => {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
-export default function Compliance({ profile }) {
+export default function Compliance({ profile, onNavigate }) {
   const today = new Date().toISOString().slice(0, 10);
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
 
@@ -306,6 +307,15 @@ export default function Compliance({ profile }) {
           );
         })}
       </div>
+
+      {/* Exceedance Calendar */}
+      {stations.length > 0 && (
+        <ExceedanceCalendar
+          station={stations[selIdx]}
+          isDemo={isDemo}
+          onNavigate={onNavigate}
+        />
+      )}
 
       {/* Compliance table */}
       <div style={{ ...glass({ padding: '20px 24px', marginBottom: 16, borderRadius: 18 }), animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.2s both' }}>

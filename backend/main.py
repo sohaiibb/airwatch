@@ -275,6 +275,12 @@ async def ws_ep(ws: WebSocket):
 # Alerts API
 # ─────────────────────────────────────────────────────────────────────────────
 
+class PushSubscription(BaseModel):
+    endpoint: str
+    p256dh: str
+    auth: str
+    user_id: Optional[str] = None
+
 class RuleUpdate(BaseModel):
     enabled: Optional[bool] = None
     warning_pct: Optional[int] = None
@@ -441,6 +447,27 @@ async def put_setting(key: str, body: dict):
     require_sb()
     sb.table("system_settings").upsert({"key": key, "value": body}).execute()
     return {"ok": True}
+
+# ── Push Subscriptions ────────────────────────────────────────────────────────
+
+@app.post("/api/push/subscribe")
+def push_subscribe(body: PushSubscription):
+    require_sb()
+    data = body.dict()
+    # Upsert by endpoint
+    sb.table("push_subscriptions").upsert(data, on_conflict="endpoint").execute()
+    return {"ok": True}
+
+@app.delete("/api/push/subscribe")
+def push_unsubscribe(endpoint: str):
+    require_sb()
+    sb.table("push_subscriptions").delete().eq("endpoint", endpoint).execute()
+    return {"ok": True}
+
+@app.get("/api/push/vapid-public-key")
+def push_vapid_key():
+    key = os.getenv("VAPID_PUBLIC_KEY", "")
+    return {"key": key}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Backfill endpoint

@@ -2,9 +2,9 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, ReferenceLine,
+  Tooltip, ResponsiveContainer, ReferenceLine, ComposedChart, Scatter, Line as RLine,
 } from 'recharts';
-import { Activity, AlertTriangle, TrendingUp, TrendingDown, Download, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { Activity, AlertTriangle, TrendingUp, TrendingDown, Download, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Search, GitBranch } from 'lucide-react';
 import { getStations, getDemoStations, getDemoHistory, getDemoDaily, getDemoReadings } from '../lib/supabase';
 import { glass, glassInner, getAqiLevel, POLLUTANTS, formatTime, formatDate } from '../lib/utils';
 
@@ -157,6 +157,229 @@ function SortArrow({ col, sortKey, sortDir }) {
   return sortDir === 'asc'
     ? <ChevronUp size={11} style={{ marginLeft: 2, verticalAlign: 'middle' }} />
     : <ChevronDown size={11} style={{ marginLeft: 2, verticalAlign: 'middle' }} />;
+}
+
+// ─── Math helpers ───
+function pearsonR(xs, ys) {
+  const n = xs.length;
+  if (n < 2) return 0;
+  const mx = xs.reduce((a, b) => a + b, 0) / n;
+  const my = ys.reduce((a, b) => a + b, 0) / n;
+  const num = xs.reduce((s, x, i) => s + (x - mx) * (ys[i] - my), 0);
+  const dx = Math.sqrt(xs.reduce((s, x) => s + (x - mx) ** 2, 0));
+  const dy = Math.sqrt(ys.reduce((s, y) => s + (y - my) ** 2, 0));
+  return dx && dy ? num / (dx * dy) : 0;
+}
+
+function linReg(xs, ys) {
+  const n = xs.length;
+  if (n < 2) return { m: 0, b: 0 };
+  const mx = xs.reduce((a, b) => a + b, 0) / n;
+  const my = ys.reduce((a, b) => a + b, 0) / n;
+  const m = xs.reduce((s, x, i) => s + (x - mx) * (ys[i] - my), 0) / xs.reduce((s, x) => s + (x - mx) ** 2, 0);
+  const b = my - m * mx;
+  return { m, b };
+}
+
+function rInterpret(r) {
+  const abs = Math.abs(r);
+  const sign = r > 0 ? 'positive' : 'negative';
+  if (abs >= 0.7) return `Strong ${sign} correlation`;
+  if (abs >= 0.4) return `Moderate ${sign} correlation`;
+  if (abs >= 0.2) return `Weak ${sign} correlation`;
+  return 'No significant correlation';
+}
+
+const CORR_PARAMS = [
+  { key: 'pm25', name: 'PM₂.₅', unit: 'µg/m³', color: '#3B82F6' },
+  { key: 'pm10', name: 'PM₁₀', unit: 'µg/m³', color: '#8B5CF6' },
+  { key: 'so2',  name: 'SO₂',  unit: 'µg/m³', color: '#F59E0B' },
+  { key: 'no2',  name: 'NO₂',  unit: 'µg/m³', color: '#06B6D4' },
+  { key: 'o3',   name: 'O₃',   unit: 'µg/m³', color: '#EC4899' },
+  { key: 'co',   name: 'CO',   unit: 'µg/m³', color: '#10B981' },
+  { key: 'temperature', name: 'Temp', unit: '°C', color: '#EF4444' },
+  { key: 'humidity',    name: 'RH',   unit: '%',  color: '#0EA5E9' },
+  { key: 'wind_speed',  name: 'Wind Speed', unit: 'm/s', color: '#A78BFA' },
+  { key: 'wind_direction', name: 'Wind Dir', unit: '°', color: '#F97316' },
+];
+
+const CORR_PRESETS = [
+  { label: 'Wind vs PM₂.₅', x: 'wind_speed', y: 'pm25' },
+  { label: 'Temp vs O₃',    x: 'temperature', y: 'o3' },
+  { label: 'RH vs PM₂.₅',  x: 'humidity', y: 'pm25' },
+  { label: 'WD vs PM₁₀',   x: 'wind_direction', y: 'pm10' },
+];
+
+function aqiDotColor(aqi) {
+  if (aqi == null) return '#94a3b8';
+  if (aqi <= 50)  return '#16A34A';
+  if (aqi <= 100) return '#CA8A04';
+  if (aqi <= 150) return '#EA580C';
+  if (aqi <= 200) return '#DC2626';
+  return '#7C3AED';
+}
+
+function CorrelationChart({ data }) {
+  const [xKey, setXKey] = useState('wind_speed');
+  const [yKey, setYKey] = useState('pm25');
+
+  const xParam = CORR_PARAMS.find(p => p.key === xKey) || CORR_PARAMS[0];
+  const yParam = CORR_PARAMS.find(p => p.key === yKey) || CORR_PARAMS[1];
+
+  // Build scatter points from hourly aggregated data
+  const points = useMemo(() => {
+    return data
+      .filter(r => r[xKey] != null && r[yKey] != null)
+      .map(r => ({
+        x: Number(r[xKey]),
+        y: Number(r[yKey]),
+        aqi: r.aqi != null ? Number(r.aqi) : null,
+      }));
+  }, [data, xKey, yKey]);
+
+  const xs = points.map(p => p.x);
+  const ys = points.map(p => p.y);
+  const r = points.length >= 2 ? pearsonR(xs, ys) : 0;
+  const { m, b } = points.length >= 2 ? linReg(xs, ys) : { m: 0, b: 0 };
+
+  // Trend line: 2 points from min to max x
+  const xMin = xs.length ? Math.min(...xs) : 0;
+  const xMax = xs.length ? Math.max(...xs) : 1;
+  const trendData = xs.length >= 2 ? [
+    { x: xMin, y: m * xMin + b },
+    { x: xMax, y: m * xMax + b },
+  ] : [];
+
+  const rColor = Math.abs(r) >= 0.7 ? '#16A34A' : Math.abs(r) >= 0.4 ? '#F59E0B' : '#94a3b8';
+
+  const selStyle = (active) => ({
+    padding: '5px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+    fontSize: 11, fontWeight: 600, fontFamily: 'var(--font)',
+    background: active ? '#0d9488' : 'var(--glass-inner-bg)',
+    color: active ? '#fff' : 'var(--text-muted)',
+    transition: 'all 0.15s',
+  });
+
+  const CustomDot = (props) => {
+    const { cx, cy, payload } = props;
+    return <circle cx={cx} cy={cy} r={3} fill={aqiDotColor(payload.aqi)} fillOpacity={0.75} stroke="none" />;
+  };
+
+  return (
+    <div style={{ ...glass({ padding: '20px 24px' }), marginTop: 20, animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) both' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+        <div>
+          <h3 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 3px', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <GitBranch size={16} color="#0d9488" /> Correlation Analysis
+          </h3>
+          <p style={{ fontSize: 11, color: 'var(--text-faint)', margin: 0 }}>Scatter plot of parameter relationships</p>
+        </div>
+
+        {/* Presets */}
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+          {CORR_PRESETS.map(p => (
+            <button key={p.label} onClick={() => { setXKey(p.x); setYKey(p.y); }} style={selStyle(xKey === p.x && yKey === p.y)}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Axis selectors */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>X Axis:</span>
+          <select value={xKey} onChange={e => setXKey(e.target.value)} style={{ padding: '5px 9px', borderRadius: 8, fontSize: 12, color: 'var(--text)', background: 'var(--glass-inner-bg)', border: '1px solid var(--glass-inner-border)', outline: 'none', fontFamily: 'var(--font)' }}>
+            {CORR_PARAMS.map(p => <option key={p.key} value={p.key}>{p.name} ({p.unit})</option>)}
+          </select>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Y Axis:</span>
+          <select value={yKey} onChange={e => setYKey(e.target.value)} style={{ padding: '5px 9px', borderRadius: 8, fontSize: 12, color: 'var(--text)', background: 'var(--glass-inner-bg)', border: '1px solid var(--glass-inner-border)', outline: 'none', fontFamily: 'var(--font)' }}>
+            {CORR_PARAMS.map(p => <option key={p.key} value={p.key}>{p.name} ({p.unit})</option>)}
+          </select>
+        </div>
+
+        {/* R value badge */}
+        {points.length >= 2 && (
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ fontSize: 10, color: 'var(--text-faint)', margin: 0, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Pearson R</p>
+              <p style={{ fontSize: 22, fontWeight: 700, margin: 0, fontFamily: 'var(--mono)', color: rColor, lineHeight: 1 }}>{r.toFixed(3)}</p>
+              <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: '2px 0 0' }}>{rInterpret(r)}</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {points.length < 2 ? (
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-faint)', fontSize: 13 }}>
+          Not enough data points — select a longer time range
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height={340}>
+          <ComposedChart margin={{ top: 10, right: 20, bottom: 20, left: 10 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" />
+            <XAxis
+              dataKey="x" type="number" domain={['auto', 'auto']}
+              name={xParam.name}
+              label={{ value: `${xParam.name} (${xParam.unit})`, position: 'insideBottom', offset: -10, fill: 'var(--text-muted)', fontSize: 11 }}
+              tick={{ fill: 'var(--text-faint)', fontSize: 10, fontFamily: 'var(--mono)' }}
+              axisLine={false} tickLine={false}
+            />
+            <YAxis
+              dataKey="y" type="number" domain={['auto', 'auto']}
+              name={yParam.name}
+              label={{ value: `${yParam.name} (${yParam.unit})`, angle: -90, position: 'insideLeft', offset: 10, fill: 'var(--text-muted)', fontSize: 11 }}
+              tick={{ fill: 'var(--text-faint)', fontSize: 10, fontFamily: 'var(--mono)' }}
+              axisLine={false} tickLine={false}
+            />
+            <Tooltip
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const d = payload[0]?.payload || {};
+                return (
+                  <div style={{ ...glass({ padding: '8px 12px', borderRadius: 10 }), boxShadow: '0 8px 24px rgba(0,0,0,0.1)' }}>
+                    <p style={{ fontSize: 11, color: 'var(--text)', margin: 0 }}>
+                      {xParam.name}: <strong style={{ fontFamily: 'var(--mono)' }}>{typeof d.x === 'number' ? d.x.toFixed(2) : d.x}</strong>
+                    </p>
+                    <p style={{ fontSize: 11, color: 'var(--text)', margin: '2px 0 0' }}>
+                      {yParam.name}: <strong style={{ fontFamily: 'var(--mono)' }}>{typeof d.y === 'number' ? d.y.toFixed(2) : d.y}</strong>
+                    </p>
+                    {d.aqi != null && <p style={{ fontSize: 10, color: aqiDotColor(d.aqi), margin: '2px 0 0' }}>AQI: {Math.round(d.aqi)}</p>}
+                  </div>
+                );
+              }}
+            />
+            <Scatter data={points} shape={<CustomDot />} />
+            {trendData.length === 2 && (
+              <RLine
+                data={trendData}
+                dataKey="y"
+                dot={false}
+                stroke="#0d9488"
+                strokeWidth={2}
+                strokeDasharray="6 3"
+                type="linear"
+                isAnimationActive={false}
+              />
+            )}
+          </ComposedChart>
+        </ResponsiveContainer>
+      )}
+
+      {/* AQI color legend */}
+      <div style={{ display: 'flex', gap: 14, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-faint)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Dot color = AQI:</span>
+        {[['#16A34A','Good (0-50)'],['#CA8A04','Moderate (51-100)'],['#EA580C','USG (101-150)'],['#DC2626','Unhealthy (151-200)'],['#7C3AED','Very Unhealthy (200+)'],['#94a3b8','Unknown']].map(([c, l]) => (
+          <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: c }} />
+            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{l}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 // ═══ Charts Page ═══
@@ -550,6 +773,9 @@ export default function Charts({ profile }) {
           </div>
         </div>
       </div>
+
+      {/* ─── Correlation Analysis ─── */}
+      <CorrelationChart data={aggregate(data, 'hourly')} />
     </div>
   );
 }

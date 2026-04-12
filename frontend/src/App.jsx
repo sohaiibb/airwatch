@@ -85,6 +85,10 @@ function AppInner({ profile, session, onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
   const [dark, setDark] = useState(() => localStorage.getItem('airwatch-theme') === 'dark');
   const [tickerVisible, setTickerVisible] = useState(() => localStorage.getItem('airwatch-ticker') !== 'off');
+  const [pushBanner, setPushBanner] = useState(() => {
+    const perm = typeof Notification !== 'undefined' ? Notification.permission : 'default';
+    return perm === 'default' && !localStorage.getItem('airwatch-push-dismissed');
+  });
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
@@ -114,7 +118,7 @@ function AppInner({ profile, session, onLogout }) {
     switch (page) {
       case 'dashboard':        return <Dashboard profile={profile} dark={dark} />;
       case 'charts':           return <Charts profile={profile} />;
-      case 'compliance':       return hasPageAccess('compliance') ? <Compliance profile={profile} /> : <Dashboard profile={profile} />;
+      case 'compliance':       return hasPageAccess('compliance') ? <Compliance profile={profile} onNavigate={navigate} /> : <Dashboard profile={profile} />;
       case 'wind-rose':        return hasPageAccess('wind_rose') ? <WindRosePage profile={profile} /> : <Dashboard profile={profile} />;
       case 'data':             return <DataTable profile={profile} />;
       case 'reports':          return <Reports profile={profile} />;
@@ -218,6 +222,44 @@ function AppInner({ profile, session, onLogout }) {
       {tickerVisible && (
         <div style={{ position: 'fixed', top: 0, left: isMobile ? 0 : (sidebarOpen ? 240 : 64), right: 0, zIndex: 20, transition: 'left 0.3s cubic-bezier(.16,1,.3,1)' }}>
           <TickerStrip visible={tickerVisible} />
+        </div>
+      )}
+
+      {/* Push notification permission banner */}
+      {pushBanner && (
+        <div style={{
+          position: 'fixed',
+          bottom: 16, left: isMobile ? 12 : (sidebarOpen ? 252 : 76),
+          right: 16, zIndex: 25,
+          ...glass({ padding: '12px 16px', borderRadius: 14 }),
+          display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.12)',
+          transition: 'left 0.3s cubic-bezier(.16,1,.3,1)',
+          animation: 'glassIn 0.4s ease both',
+        }}>
+          <Bell size={16} color="#0d9488" style={{ flexShrink: 0 }} />
+          <p style={{ flex: 1, fontSize: 13, color: 'var(--text)', margin: 0, minWidth: 200 }}>
+            Enable push notifications for real-time air quality alerts
+          </p>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <button
+              onClick={async () => {
+                setPushBanner(false);
+                localStorage.setItem('airwatch-push-dismissed', '1');
+                if ('Notification' in window) {
+                  const permission = await Notification.requestPermission();
+                  if (permission === 'granted') {
+                    localStorage.setItem('airwatch-push-enabled', '1');
+                  }
+                }
+              }}
+              style={{ padding: '7px 14px', borderRadius: 9, border: 'none', background: '#0d9488', color: '#fff', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)', cursor: 'pointer' }}
+            >Enable</button>
+            <button
+              onClick={() => { setPushBanner(false); localStorage.setItem('airwatch-push-dismissed', '1'); }}
+              style={{ padding: '7px 12px', borderRadius: 9, border: 'none', background: 'var(--glass-inner-bg)', color: 'var(--text-muted)', fontSize: 12, fontWeight: 500, fontFamily: 'var(--font)', cursor: 'pointer' }}
+            >Not Now</button>
+          </div>
         </div>
       )}
 

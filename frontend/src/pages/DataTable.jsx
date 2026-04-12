@@ -216,12 +216,28 @@ export default function DataTable({ profile }) {
 
   // ── Date range mode ───────────────────────────────────────────────────────
   // rangeMode: 'preset' | 'custom' | 'all'
-  const [rangeMode,    setRangeMode]    = useState('preset');
+  const [rangeMode,    setRangeMode]    = useState(() => localStorage.getItem('aw-data-from') ? 'custom' : 'preset');
   const [presetHours,  setPresetHours]  = useState(168);   // 7D default
-  const [customFrom,   setCustomFrom]   = useState(toLocalInput(weekAgo));
-  const [customTo,     setCustomTo]     = useState(toLocalInput(now));
-  const [pendingFrom,  setPendingFrom]  = useState(toLocalInput(weekAgo));
-  const [pendingTo,    setPendingTo]    = useState(toLocalInput(now));
+  const [customFrom,   setCustomFrom]   = useState(() => {
+    const stored = localStorage.getItem('aw-data-from');
+    if (stored) return stored + 'T00:00';
+    return toLocalInput(weekAgo);
+  });
+  const [customTo,     setCustomTo]     = useState(() => {
+    const stored = localStorage.getItem('aw-data-to');
+    if (stored) return stored + 'T23:59';
+    return toLocalInput(now);
+  });
+  const [pendingFrom,  setPendingFrom]  = useState(() => {
+    const stored = localStorage.getItem('aw-data-from');
+    if (stored) return stored + 'T00:00';
+    return toLocalInput(weekAgo);
+  });
+  const [pendingTo,    setPendingTo]    = useState(() => {
+    const stored = localStorage.getItem('aw-data-to');
+    if (stored) return stored + 'T23:59';
+    return toLocalInput(now);
+  });
 
   // ── Aggregation ───────────────────────────────────────────────────────────
   const [agg, setAgg] = useState('raw');
@@ -242,6 +258,12 @@ export default function DataTable({ profile }) {
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState('');
   const [warning,      setWarning]      = useState('');
+
+  // ── Clear calendar-navigation localStorage keys on mount ─────────────────
+  useEffect(() => {
+    localStorage.removeItem('aw-data-from');
+    localStorage.removeItem('aw-data-to');
+  }, []);
 
   // ── Ref to abort in-progress fetches ─────────────────────────────────────
   const fetchIdRef = useRef(0);

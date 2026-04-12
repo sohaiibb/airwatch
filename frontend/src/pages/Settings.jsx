@@ -135,6 +135,96 @@ function StatusBadge({ active }) {
   );
 }
 
+// ── Push Notifications Component ──────────────────────────────────────────────
+
+function PushNotificationSection() {
+  const [permission, setPermission] = useState(() =>
+    typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
+  );
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState('');
+  const [notifyExceed, setNotifyExceed] = useState(() => localStorage.getItem('aw-push-exceed') !== 'false');
+  const [notifyWarning, setNotifyWarning] = useState(() => localStorage.getItem('aw-push-warning') === 'true');
+  const [notifyCleared, setNotifyCleared] = useState(() => localStorage.getItem('aw-push-cleared') !== 'false');
+
+  async function handleEnable() {
+    if (!('Notification' in window)) { setTestMsg('Push notifications not supported in this browser.'); return; }
+    const perm = await Notification.requestPermission();
+    setPermission(perm);
+    if (perm === 'granted') {
+      localStorage.setItem('airwatch-push-enabled', '1');
+      localStorage.removeItem('airwatch-push-dismissed');
+      setTestMsg('Push notifications enabled!');
+    } else {
+      setTestMsg('Permission denied. Check browser settings.');
+    }
+  }
+
+  async function handleTest() {
+    if (permission !== 'granted') { setTestMsg('Enable push notifications first.'); return; }
+    setTesting(true);
+    try {
+      new Notification('AirWatch Test', {
+        body: 'Push notifications are working correctly.',
+        icon: '/favicon.svg',
+      });
+      setTestMsg('Test notification sent!');
+    } catch (e) {
+      setTestMsg('Failed: ' + e.message);
+    }
+    setTesting(false);
+    setTimeout(() => setTestMsg(''), 3000);
+  }
+
+  const enabled = permission === 'granted';
+  const statusColor = enabled ? '#16A34A' : permission === 'denied' ? '#DC2626' : '#F59E0B';
+  const statusLabel = enabled ? 'Enabled' : permission === 'denied' ? 'Blocked' : permission === 'unsupported' ? 'Not Supported' : 'Not Enabled';
+
+  return (
+    <div>
+      {/* Status + enable */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20, padding: '12px 16px', borderRadius: 12, background: enabled ? 'rgba(22,163,74,0.08)' : 'rgba(0,0,0,0.03)', border: `1px solid ${enabled ? 'rgba(22,163,74,0.2)' : 'var(--border)'}` }}>
+        <div style={{ width: 10, height: 10, borderRadius: '50%', background: statusColor, boxShadow: enabled ? '0 0 8px rgba(22,163,74,0.4)' : 'none', flexShrink: 0 }} />
+        <div style={{ flex: 1 }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: statusColor, margin: 0 }}>{statusLabel}</p>
+          <p style={{ fontSize: 11, color: 'var(--text-faint)', margin: '2px 0 0' }}>
+            {enabled ? 'Browser will receive real-time exceedance alerts' : 'Click Enable to get real-time alerts'}
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {!enabled && permission !== 'unsupported' && (
+            <button onClick={handleEnable} style={{ padding: '7px 16px', borderRadius: 9, border: 'none', background: '#0d9488', color: '#fff', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)', cursor: 'pointer' }}>
+              Enable Push
+            </button>
+          )}
+          {enabled && (
+            <button onClick={handleTest} disabled={testing} style={{ padding: '7px 16px', borderRadius: 9, border: 'none', background: 'rgba(13,148,136,0.12)', color: '#0d9488', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)', cursor: testing ? 'not-allowed' : 'pointer', opacity: testing ? 0.6 : 1 }}>
+              Send Test
+            </button>
+          )}
+        </div>
+      </div>
+
+      {testMsg && (
+        <p style={{ fontSize: 12, color: testMsg.includes('!') ? '#16A34A' : '#DC2626', margin: '-12px 0 16px', fontWeight: 500 }}>{testMsg}</p>
+      )}
+
+      {/* Notification preferences */}
+      <div style={{ opacity: enabled ? 1 : 0.5, pointerEvents: enabled ? 'auto' : 'none' }}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-faint)', margin: '0 0 12px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Notification Preferences</p>
+        <Toggle value={notifyExceed} onChange={v => { setNotifyExceed(v); localStorage.setItem('aw-push-exceed', String(v)); }} label="Notify on NCEC exceedances (recommended)" />
+        <Toggle value={notifyWarning} onChange={v => { setNotifyWarning(v); localStorage.setItem('aw-push-warning', String(v)); }} label="Notify at 80% of limit (early warning)" />
+        <Toggle value={notifyCleared} onChange={v => { setNotifyCleared(v); localStorage.setItem('aw-push-cleared', String(v)); }} label="Notify when alert clears" />
+      </div>
+
+      <p style={{ fontSize: 11, color: 'var(--text-faint)', margin: '16px 0 0', lineHeight: 1.5 }}>
+        Push notifications require a modern browser (Chrome, Firefox, Edge). Safari on iOS 16.4+ is supported.
+        Notifications are delivered directly to your browser — no SMS or email required.
+      </p>
+    </div>
+  );
+}
+
 // ── Main Settings Component ────────────────────────────────────────────────────
 
 export default function Settings({ profile }) {
@@ -768,6 +858,11 @@ export default function Settings({ profile }) {
           <button onClick={handleSignOut} style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 16, padding: '9px 16px', borderRadius: 10, border: 'none', background: 'rgba(220,38,38,0.08)', color: '#DC2626', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', cursor: 'pointer', width: '100%', justifyContent: 'center' }}>
             Sign Out
           </button>
+        </SectionCard>
+
+        {/* Push Notifications */}
+        <SectionCard title="Push Notifications" icon={Bell} fullWidth>
+          <PushNotificationSection />
         </SectionCard>
 
       </div>
