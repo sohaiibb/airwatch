@@ -76,6 +76,8 @@ a{color:inherit;text-decoration:none}
 @keyframes gaugeGlow{0%,100%{box-shadow:0 0 30px rgba(22,163,74,.15)}50%{box-shadow:0 0 50px rgba(22,163,74,.25)}}
 @keyframes ticker-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 @keyframes live-pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+@keyframes aw-map-pulse{0%,100%{box-shadow:0 0 8px var(--aqi-glow,#16A34A),0 2px 16px rgba(0,0,0,0.08)}50%{box-shadow:0 0 22px var(--aqi-glow,#16A34A),0 2px 16px rgba(0,0,0,0.08)}}
+.aw-mini-map-wrap{animation:aw-map-pulse 2.5s ease-in-out infinite}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 /* Dark mode — form inputs */
 [data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
@@ -101,3 +103,56 @@ a{color:inherit;text-decoration:none}
   [data-scroll-x]{position:relative}
   [data-scroll-x]::after{content:'';position:absolute;top:0;right:0;width:32px;height:100%;background:linear-gradient(to right,transparent,var(--bg));pointer-events:none;z-index:3;border-radius:0 12px 12px 0}
 }
+
+/* ─── Global Mobile Fixes ──────────────────────────────────────────────────── */
+@media(max-width:767px){
+  /* Prevent horizontal overflow everywhere */
+  *{max-width:100%;box-sizing:border-box}
+  img,video,svg:not([class*="recharts"]):not([class*="leaflet"]):not([class*="aw"]){max-width:100%;height:auto}
+
+  /* Touch targets — all interactive elements */
+  button,a,[role="button"],select{min-height:40px}
+
+  /* All table wrappers should scroll horizontally */
+  [data-scroll-x]{overflow-x:auto!important;-webkit-overflow-scrolling:touch}
+
+  /* Ensure tables have a minimum width so they don't collapse */
+  table{min-width:600px}
+
+  /* Input, select full width on mobile */
+  input[type="text"],input[type="email"],input[type="password"],input[type="date"],textarea{width:100%;max-width:100%}
+
+  /* Ticker — smaller font on tiny screens */
+  .aw-ticker-item{font-size:10px!important}
+
+  /* Recharts responsive containers don't overflow */
+  .recharts-wrapper{max-width:100%!important;overflow:hidden}
+}
+
+/* ─── Page-specific Mobile Rules ─────────────────────────────────────────── */
+@media(max-width:767px){
+  /* Reports — stack form controls and parameter checkboxes */
+  .aw-reports-controls{flex-direction:column!important;align-items:stretch!important}
+  .aw-reports-presets{flex-wrap:wrap!important}
+  .aw-reports-params{column-count:1!important}
+
+  /* Settings — full width cards */
+  .aw-settings-grid{grid-template-columns:1fr!important}
+
+  /* Alerts — full width cards, table overflow */
+  .aw-alerts-list{grid-template-columns:1fr!important}
+
+  /* Wind Rose SVG container */
+  .aw-wind-rose-svg{width:100%!important;min-height:300px!important}
+
+  /* Admin panels — stack list + detail */
+  .aw-admin-layout{grid-template-columns:1fr!important}
+
+  /* Compliance — calendar overflow */
+  .aw-calendar-scroll{overflow-x:auto!important;-webkit-overflow-scrolling:touch}
+}
+
+/* ─── Leaflet mobile overrides ───────────────────────────────────────────── */
+.leaflet-container{font-family:var(--font)!important}
+.leaflet-control-zoom{display:none}
+.aw-mini-map-wrap .leaflet-container{background:transparent!important}
