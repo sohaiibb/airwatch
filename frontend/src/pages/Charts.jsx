@@ -220,6 +220,7 @@ function aqiDotColor(aqi) {
 }
 
 function CorrelationChart({ data }) {
+  console.log('[CorrelationChart] rendering, data points:', data?.length);
   const [xKey, setXKey] = useState('wind_speed');
   const [yKey, setYKey] = useState('pm25');
 
@@ -604,6 +605,9 @@ export default function Charts({ profile }) {
         </ResponsiveContainer>
       </div>
 
+      {/* ─── Correlation Analysis ─── */}
+      <CorrelationChart data={aggregate(data, 'hourly')} />
+
       {/* ─── Data Table ─── */}
       <div style={{ ...glass({ padding: '20px 22px' }), animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.4s both' }}>
 
@@ -774,8 +778,6 @@ export default function Charts({ profile }) {
         </div>
       </div>
 
-      {/* ─── Correlation Analysis ─── */}
-      <CorrelationChart data={aggregate(data, 'hourly')} />
     </div>
   );
 }

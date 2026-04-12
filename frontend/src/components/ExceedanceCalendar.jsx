@@ -127,6 +127,7 @@ function buildMonthLabels(year, weeks) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function ExceedanceCalendar({ station, isDemo, onNavigate }) {
+  console.log('[ExceedanceCalendar] rendering', { station: station?.name, isDemo });
   const currentYear = new Date().getFullYear();
   const yearOptions = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3, currentYear - 4];
 
@@ -147,6 +148,7 @@ export default function ExceedanceCalendar({ station, isDemo, onNavigate }) {
 
         if (isDemo) {
           readings = getDemoHistory(station.id, 8760);
+          console.log('[ExceedanceCalendar] demo readings loaded:', readings.length, 'first ts:', readings[0]?.timestamp);
         } else {
           const fromISO = `${year}-01-01T00:00:00`;
           const toISO   = `${year}-12-31T23:59:59`;
@@ -204,8 +206,10 @@ export default function ExceedanceCalendar({ station, isDemo, onNavigate }) {
           map[day] = { aqi, exceedances, count: recs.length, maxVals };
         });
 
+        console.log('[ExceedanceCalendar] dayMap built:', Object.keys(map).length, 'days');
         setDayMap(map);
-      } catch {
+      } catch (err) {
+        console.error('[ExceedanceCalendar] load error:', err);
         setDayMap({});
       }
       setLoading(false);
