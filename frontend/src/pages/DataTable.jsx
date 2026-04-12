@@ -255,12 +255,13 @@ export default function DataTable({ profile }) {
 
   // ─────────────────────────────────────────────────────────────────────────
   // Fetch ALL readings for a date range via chunked pagination.
-  // Supabase defaults to 1000 rows — this bypasses that by looping .range()
-  // until fewer than FETCH_CHUNK rows come back, then stops.
+  // Supabase/PostgREST caps queries at 1,000 rows (max_rows setting).
+  // We use FETCH_CHUNK = 1000 to match that cap exactly: if a chunk returns
+  // exactly 1000 rows, there may be more — keep fetching. If fewer, we're done.
   // ─────────────────────────────────────────────────────────────────────────
 
   async function fetchAllReadings(fromISO, toISO, myId, onProgress) {
-    const FETCH_CHUNK = 5000;
+    const FETCH_CHUNK = 1000;
     let all    = [];
     let offset = 0;
 
@@ -279,11 +280,13 @@ export default function DataTable({ profile }) {
       if (!data || data.length === 0) break;
 
       all = all.concat(data);
+      console.log(`[DataTable] fetchAllReadings chunk ${offset/FETCH_CHUNK + 1}: got ${data.length} rows, total so far: ${all.length}`);
       if (onProgress) onProgress(all.length);
       if (data.length < FETCH_CHUNK) break;
       offset += FETCH_CHUNK;
     }
 
+    console.log(`[DataTable] fetchAllReadings complete: ${all.length} total rows`);
     return all;
   }
 
@@ -391,7 +394,9 @@ export default function DataTable({ profile }) {
 
       setWarning(''); // clear progress message
 
+      console.log(`[DataTable] Aggregating ${allReadings.length} raw readings with mode="${aggMode}"`);
       const aggregated = aggregateReadings(allReadings, aggMode);
+      console.log(`[DataTable] Aggregation result: ${aggregated.length} ${aggMode} rows`);
       const sorted     = sortRows(aggregated, sortC, sortA);
       const filtered   = filterRows(sorted, searchQ, aggMode);
 
