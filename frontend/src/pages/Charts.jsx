@@ -150,6 +150,240 @@ function GasChart({ pollutant, data }) {
   );
 }
 
+// ─── Wind Rose ───
+const WIND_DIRS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+const WIND_SPEED_BINS = [
+  { label: 'Calm',       range: '≤0.5 m/s',  min: 0,   max: 0.5,      color: '#D6D3D1' },
+  { label: 'Light',      range: '0.5–2 m/s', min: 0.5, max: 2,        color: '#06B6D4' },
+  { label: 'Moderate',   range: '2–4 m/s',   min: 2,   max: 4,        color: '#16A34A' },
+  { label: 'Fresh',      range: '4–6 m/s',   min: 4,   max: 6,        color: '#F59E0B' },
+  { label: 'Strong',     range: '6–8 m/s',   min: 6,   max: 8,        color: '#EA580C' },
+  { label: 'Very Strong',range: '8+ m/s',    min: 8,   max: Infinity, color: '#DC2626' },
+];
+const N_SECTORS = 16;
+
+function processWindRose(data) {
+  const sectors = Array.from({ length: N_SECTORS }, () => new Array(WIND_SPEED_BINS.length).fill(0));
+  let calmCount = 0, validCount = 0;
+  data.forEach(r => {
+    const spd = r.wind_speed     != null ? Number(r.wind_speed)     : null;
+    const dir = r.wind_direction != null ? Number(r.wind_direction) : null;
+    if (spd == null || dir == null || isNaN(spd) || isNaN(dir)) return;
+    validCount++;
+    if (spd <= 0.5) { calmCount++; return; }
+    const si = Math.round(((dir % 360) + 360) % 360 / (360 / N_SECTORS)) % N_SECTORS;
+    const bi = WIND_SPEED_BINS.findIndex(b => spd >= b.min && (b.max === Infinity || spd < b.max));
+    if (bi >= 0) sectors[si][bi]++;
+  });
+  return { sectors, calmCount, validCount };
+}
+
+function polarPt(cx, cy, r, deg) {
+  const rad = deg * Math.PI / 180;
+  return [+(cx + r * Math.sin(rad)).toFixed(2), +(cy - r * Math.cos(rad)).toFixed(2)];
+}
+
+function petalPath(cx, cy, r1, r2, startDeg, endDeg) {
+  const [ax, ay] = polarPt(cx, cy, r2, startDeg);
+  const [bx, by] = polarPt(cx, cy, r2, endDeg);
+  const la = endDeg - startDeg > 180 ? 1 : 0;
+  if (r1 < 0.5)
+    return `M ${cx} ${cy} L ${ax} ${ay} A ${r2.toFixed(2)} ${r2.toFixed(2)} 0 ${la} 1 ${bx} ${by} Z`;
+  const [cx1, cy1] = polarPt(cx, cy, r1, startDeg);
+  const [dx,  dy]  = polarPt(cx, cy, r1, endDeg);
+  return `M ${cx1} ${cy1} L ${ax} ${ay} A ${r2.toFixed(2)} ${r2.toFixed(2)} 0 ${la} 1 ${bx} ${by} L ${dx} ${dy} A ${r1.toFixed(2)} ${r1.toFixed(2)} 0 ${la} 0 ${cx1} ${cy1} Z`;
+}
+
+function WindRose({ data, timeRange }) {
+  const [hovered, setHovered] = useState(null);
+  const VB = 440, CX = 220, CY = 220, MAX_R = 158, LABEL_R = 183, GAP = 0.8;
+
+  const { sectors, calmCount, validCount } = useMemo(() => processWindRose(data), [data]);
+  const sectorTotals = useMemo(() => sectors.map(s => s.reduce((a, b) => a + b, 0)), [sectors]);
+  const maxFreq  = Math.max(...sectorTotals, 1);
+  const calmPct  = validCount > 0 ? (calmCount / validCount * 100).toFixed(1) : '—';
+  const domIdx   = sectorTotals.indexOf(Math.max(...sectorTotals));
+
+  const petals = useMemo(() => {
+    const out = [];
+    sectors.forEach((bins, si) => {
+      const center = si * (360 / N_SECTORS);
+      const half   = 360 / N_SECTORS / 2 - GAP;
+      let r0 = 0;
+      bins.forEach((count, bi) => {
+        const dr = (count / maxFreq) * MAX_R;
+        if (count > 0)
+          out.push({ si, bi, count, r1: r0, r2: r0 + dr, start: center - half, end: center + half });
+        r0 += dr;
+      });
+    });
+    return out;
+  }, [sectors, maxFreq]);
+
+  const rings = [0.25, 0.5, 0.75, 1].map(f => ({
+    r: MAX_R * f,
+    label: validCount > 0 ? (maxFreq * f / validCount * 100).toFixed(0) + '%' : '',
+  }));
+
+  const TIME_LABELS = { '1h':'1 hour','6h':'6 hours','12h':'12 hours','24h':'24 hours','7d':'7 days','30d':'30 days' };
+
+  return (
+    <div style={{ ...glass({ padding: '20px 22px', marginBottom: 16 }), animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.35s both' }}>
+      <div style={{ marginBottom: 16 }}>
+        <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>Wind Rose</h2>
+        <p style={{ color: '#A8A29E', fontSize: 11, margin: '2px 0 0' }}>
+          Wind direction &amp; speed distribution · {TIME_LABELS[timeRange] || timeRange} · {validCount} readings
+        </p>
+      </div>
+
+      <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        {/* SVG rose */}
+        <div style={{ position: 'relative', flex: '0 0 auto' }}>
+          <svg viewBox={`0 0 ${VB} ${VB}`} style={{ width: '100%', maxWidth: 380, height: 'auto', display: 'block' }}>
+            {/* Reference rings */}
+            {rings.map((ring, i) => (
+              <g key={i}>
+                <circle cx={CX} cy={CY} r={ring.r} fill="none"
+                  stroke="rgba(0,0,0,0.08)" strokeWidth={0.8}
+                  strokeDasharray={i < 3 ? '4 4' : undefined} />
+                {ring.label && (
+                  <text x={CX + 3} y={CY - ring.r + 9} fontSize={8}
+                    fill="#A8A29E" fontFamily="'DM Mono',monospace">{ring.label}</text>
+                )}
+              </g>
+            ))}
+
+            {/* Spokes */}
+            {Array.from({ length: N_SECTORS }, (_, i) => {
+              const [x2, y2] = polarPt(CX, CY, MAX_R, i * (360 / N_SECTORS));
+              return <line key={i} x1={CX} y1={CY} x2={x2} y2={y2}
+                stroke="rgba(0,0,0,0.06)" strokeWidth={0.7} />;
+            })}
+
+            {/* Petals */}
+            {petals.map((p, i) => (
+              <path key={i}
+                d={petalPath(CX, CY, p.r1, p.r2, p.start, p.end)}
+                fill={WIND_SPEED_BINS[p.bi].color}
+                fillOpacity={hovered === p.si ? 1 : 0.80}
+                stroke="rgba(255,255,255,0.55)" strokeWidth={0.6}
+                style={{ cursor: 'pointer', transition: 'fill-opacity 0.12s' }}
+                onMouseEnter={() => setHovered(p.si)}
+                onMouseLeave={() => setHovered(null)}
+              />
+            ))}
+
+            {/* Empty state */}
+            {validCount === 0 && (
+              <text x={CX} y={CY + 4} textAnchor="middle" dominantBaseline="middle"
+                fontSize={12} fill="#A8A29E" fontFamily="'Instrument Sans',sans-serif">
+                No wind data
+              </text>
+            )}
+
+            {/* Center circle */}
+            <circle cx={CX} cy={CY} r={25}
+              fill="rgba(255,255,255,0.75)" stroke="rgba(255,255,255,0.9)" strokeWidth={1.5} />
+            <text x={CX} y={CY - 5} textAnchor="middle"
+              fontSize={13} fontWeight="700" fill="#1C1917"
+              fontFamily="'DM Mono',monospace">{calmPct}%</text>
+            <text x={CX} y={CY + 9} textAnchor="middle"
+              fontSize={7.5} fill="#78716C"
+              fontFamily="'Instrument Sans',sans-serif"
+              fontWeight="700" letterSpacing="0.07em">CALM</text>
+
+            {/* Direction labels */}
+            {WIND_DIRS.map((dir, i) => {
+              const [x, y]  = polarPt(CX, CY, LABEL_R, i * (360 / N_SECTORS));
+              const primary = i % 4 === 0;
+              const inter   = i % 2 === 0;
+              return (
+                <text key={dir} x={x} y={y}
+                  textAnchor="middle" dominantBaseline="middle"
+                  fontSize={primary ? 12 : inter ? 10 : 8.5}
+                  fontWeight={primary ? 700 : inter ? 600 : 400}
+                  fill={hovered === i ? '#16A34A' : primary ? '#1C1917' : '#78716C'}
+                  fontFamily="'Instrument Sans',sans-serif"
+                >{dir}</text>
+              );
+            })}
+          </svg>
+
+          {/* Hover tooltip */}
+          {hovered !== null && sectorTotals[hovered] > 0 && (
+            <div style={{
+              position: 'absolute', top: 8, left: 8,
+              ...glassInner({ padding: '10px 14px' }),
+              pointerEvents: 'none', minWidth: 168,
+            }}>
+              <p style={{ fontSize: 13, fontWeight: 700, margin: '0 0 8px', color: '#1C1917' }}>
+                {WIND_DIRS[hovered]}
+              </p>
+              {WIND_SPEED_BINS.slice(1).map((bin, i) => {
+                const count = sectors[hovered][i + 1];
+                if (!count) return null;
+                return (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: 2, background: bin.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 10, color: '#57534E', flex: 1 }}>{bin.label}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#1C1917' }}>
+                      {count}{' '}
+                      <span style={{ color: '#A8A29E', fontWeight: 400 }}>
+                        ({validCount > 0 ? (count / validCount * 100).toFixed(0) : 0}%)
+                      </span>
+                    </span>
+                  </div>
+                );
+              })}
+              <div style={{ borderTop: '1px solid rgba(0,0,0,0.07)', marginTop: 6, paddingTop: 6, display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 10, color: '#78716C' }}>Sector total</span>
+                <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#1C1917' }}>
+                  {sectorTotals[hovered]} ({validCount > 0 ? (sectorTotals[hovered] / validCount * 100).toFixed(0) : 0}%)
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Legend + stats */}
+        <div style={{ flex: '1 1 160px', minWidth: 160 }}>
+          <p style={{ fontSize: 10, fontWeight: 700, color: '#78716C', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 10px' }}>
+            WIND SPEED
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 22 }}>
+            {WIND_SPEED_BINS.map((bin, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 28, height: 10, borderRadius: 3, background: bin.color, flexShrink: 0 }} />
+                <span style={{ fontSize: 11, color: '#44403C' }}>
+                  {bin.label}{' '}
+                  <span style={{ color: '#A8A29E', fontSize: 10 }}>{bin.range}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ ...glassInner({ padding: '12px 14px' }) }}>
+            <p style={{ fontSize: 10, fontWeight: 700, color: '#78716C', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 10px' }}>
+              STATISTICS
+            </p>
+            {[
+              { label: 'Total readings',  value: validCount },
+              { label: 'Calm ≤0.5 m/s',  value: `${calmCount} (${calmPct}%)` },
+              { label: 'Dominant dir.',   value: domIdx >= 0 && sectorTotals[domIdx] > 0 ? WIND_DIRS[domIdx] : '—' },
+              { label: 'Peak frequency',  value: validCount > 0 ? (sectorTotals[domIdx] / validCount * 100).toFixed(0) + '%' : '—' },
+            ].map((s, i, arr) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: i < arr.length - 1 ? 8 : 0 }}>
+                <span style={{ fontSize: 11, color: '#78716C' }}>{s.label}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', color: '#1C1917' }}>{s.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Sort arrow ───
 function SortArrow({ col, sortKey, sortDir }) {
   if (sortKey !== col) return <span style={{ color: '#D6D3D1', marginLeft: 3, fontSize: 9 }}>⇅</span>;
@@ -370,6 +604,9 @@ export default function Charts({ profile }) {
           </LineChart>
         </ResponsiveContainer>
       </div>
+
+      {/* Wind Rose */}
+      <WindRose data={data} timeRange={timeRange} />
 
       {/* ─── Data Table ─── */}
       <div style={{ ...glass({ padding: '20px 22px' }), animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.4s both' }}>
