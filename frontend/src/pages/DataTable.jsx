@@ -254,19 +254,53 @@ export default function DataTable({ profile }) {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Core fetch functions
+  // Fetch ALL readings for a date range via chunked pagination.
+  // Supabase defaults to 1000 rows — this bypasses that by looping .range()
+  // until fewer than FETCH_CHUNK rows come back, then stops.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async function fetchAllReadings(fromISO, toISO, myId, onProgress) {
+    const FETCH_CHUNK = 5000;
+    let all    = [];
+    let offset = 0;
+
+    while (true) {
+      const { data, error: fetchErr } = await supabase
+        .from('readings')
+        .select('*')
+        .eq('station_id', stationId)
+        .gte('timestamp', fromISO)
+        .lte('timestamp', toISO)
+        .order('timestamp', { ascending: true })
+        .range(offset, offset + FETCH_CHUNK - 1);
+
+      if (myId !== fetchIdRef.current) return null; // stale fetch
+      if (fetchErr) throw new Error(fetchErr.message);
+      if (!data || data.length === 0) break;
+
+      all = all.concat(data);
+      if (onProgress) onProgress(all.length);
+      if (data.length < FETCH_CHUNK) break;
+      offset += FETCH_CHUNK;
+    }
+
+    return all;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Core fetch function
   // ─────────────────────────────────────────────────────────────────────────
 
   const fetchData = useCallback(async (opts = {}) => {
     if (!stationId) return;
     const myId = ++fetchIdRef.current;
 
-    const pageNum  = opts.page  ?? 0;
-    const sortC    = opts.sortCol ?? sortCol;
-    const sortA    = opts.sortAsc ?? sortAsc;
-    const searchQ  = opts.search  ?? search;
-    const aggMode  = opts.agg     ?? agg;
-    const range    = opts.range   ?? getRange();
+    const pageNum = opts.page   ?? 0;
+    const sortC   = opts.sortCol ?? sortCol;
+    const sortA   = opts.sortAsc ?? sortAsc;
+    const searchQ = opts.search  ?? search;
+    const aggMode = opts.agg     ?? agg;
+    const range   = opts.range   ?? getRange();
 
     setLoading(true);
     setError('');
@@ -282,54 +316,47 @@ export default function DataTable({ profile }) {
         if (isDemo) {
           const hours = Math.max(1, Math.ceil((new Date(range.toISO) - new Date(range.fromISO)) / 3600000));
           allData = generateDemoHistory(Math.min(hours, 720));
-        } else {
-          // Get total count first
-          const { count: total } = await supabase
-            .from('readings')
-            .select('*', { count: 'exact', head: true })
-            .eq('station_id', stationId)
-            .gte('timestamp', range.fromISO)
-            .lte('timestamp', range.toISO);
-
-          if (myId !== fetchIdRef.current) return;
-
-          if (total > 10000 && rangeMode === 'all') {
-            setWarning(`${total.toLocaleString()} records found. Loading page-by-page for performance.`);
-          }
-
-          // Fetch current page
-          const orderCol = sortC === 'timestamp' ? 'timestamp' : sortC;
-          const { data, error: fetchErr } = await supabase
-            .from('readings')
-            .select('*')
-            .eq('station_id', stationId)
-            .gte('timestamp', range.fromISO)
-            .lte('timestamp', range.toISO)
-            .order(orderCol, { ascending: sortA })
-            .order('timestamp', { ascending: sortA })
-            .range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1);
-
-          if (myId !== fetchIdRef.current) return;
-          if (fetchErr) { setError(fetchErr.message); setLoading(false); return; }
-
-          setRawTotal(total || 0);
-          setTotalCount(total || 0);
+          const sorted   = sortRows(allData, sortC, sortA);
+          const filtered = filterRows(sorted, searchQ, aggMode);
+          setRawTotal(allData.length);
+          setTotalCount(filtered.length);
           setPage(pageNum);
-          setDisplayRows(data || []);
-          setAllRows(data || []);
+          setAllRows(filtered);
+          setDisplayRows(filtered.slice(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE));
           setLoading(false);
           return;
         }
 
-        // Demo: do client-side for raw
+        // Get total count
+        const { count: total } = await supabase
+          .from('readings')
+          .select('*', { count: 'exact', head: true })
+          .eq('station_id', stationId)
+          .gte('timestamp', range.fromISO)
+          .lte('timestamp', range.toISO);
+
         if (myId !== fetchIdRef.current) return;
-        const sorted   = sortRows(allData, sortC, sortA);
-        const filtered = filterRows(sorted, searchQ, aggMode);
-        setRawTotal(allData.length);
-        setTotalCount(filtered.length);
+
+        // Fetch current page with server-side sort
+        const orderCol = sortC === 'timestamp' ? 'timestamp' : sortC;
+        const { data, error: fetchErr } = await supabase
+          .from('readings')
+          .select('*')
+          .eq('station_id', stationId)
+          .gte('timestamp', range.fromISO)
+          .lte('timestamp', range.toISO)
+          .order(orderCol, { ascending: sortA })
+          .order('timestamp', { ascending: sortA })
+          .range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1);
+
+        if (myId !== fetchIdRef.current) return;
+        if (fetchErr) { setError(fetchErr.message); setLoading(false); return; }
+
+        setRawTotal(total || 0);
+        setTotalCount(total || 0);
         setPage(pageNum);
-        setAllRows(filtered);
-        setDisplayRows(filtered.slice(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE));
+        setDisplayRows(data || []);
+        setAllRows(data || []);
         setLoading(false);
         return;
 
@@ -341,7 +368,9 @@ export default function DataTable({ profile }) {
       }
     }
 
-    // ── AGGREGATED modes: fetch all, aggregate client-side ────────────────
+    // ── AGGREGATED modes (1min / hourly / daily) ──────────────────────────
+    // Always fetch the full raw dataset for the range, then aggregate in JS.
+    // For large ranges this uses chunked pagination (5k rows per request).
     try {
       let allReadings;
 
@@ -349,28 +378,18 @@ export default function DataTable({ profile }) {
         const hours = Math.max(1, Math.ceil((new Date(range.toISO) - new Date(range.fromISO)) / 3600000));
         allReadings = generateDemoHistory(Math.min(hours, 720));
       } else {
-        // Warn about 1-Min + large range
-        const spanHours = (new Date(range.toISO) - new Date(range.fromISO)) / 3600000;
-        let effectiveTo = range.toISO;
-        if (aggMode === '1min' && spanHours > 7 * 24) {
-          setWarning('1-Minute aggregation is limited to 7 days for performance. Showing most recent 7 days.');
-          effectiveTo = new Date(new Date(range.fromISO).getTime() + 7 * 24 * 3600000).toISOString();
-        }
-
-        const { data, error: fetchErr } = await supabase
-          .from('readings')
-          .select('*')
-          .eq('station_id', stationId)
-          .gte('timestamp', range.fromISO)
-          .lte('timestamp', effectiveTo)
-          .order('timestamp', { ascending: true });
-
-        if (myId !== fetchIdRef.current) return;
-        if (fetchErr) { setError(fetchErr.message); setLoading(false); return; }
-        allReadings = data || [];
+        allReadings = await fetchAllReadings(
+          range.fromISO,
+          range.toISO,
+          myId,
+          (n) => setWarning(`Loading… ${n.toLocaleString()} rows fetched`),
+        );
+        if (allReadings === null) return; // fetch was superseded
       }
 
       if (myId !== fetchIdRef.current) return;
+
+      setWarning(''); // clear progress message
 
       const aggregated = aggregateReadings(allReadings, aggMode);
       const sorted     = sortRows(aggregated, sortC, sortA);
@@ -388,7 +407,7 @@ export default function DataTable({ profile }) {
     }
 
     setLoading(false);
-  }, [stationId, sortCol, sortAsc, search, agg, rangeMode, presetHours, customFrom, customTo]);
+  }, [stationId, sortCol, sortAsc, search, agg, rangeMode, presetHours, customFrom, customTo]); // eslint-disable-line
 
   // ─────────────────────────────────────────────────────────────────────────
   // Effect: load stations on mount, then auto-fetch
@@ -786,9 +805,9 @@ export default function DataTable({ profile }) {
           </div>
         )}
         {warning && !error && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 10, padding: '7px 12px', background: 'rgba(234,179,8,0.07)', border: '1px solid rgba(234,179,8,0.3)', borderRadius: 8 }}>
-            <AlertTriangle size={13} color="#CA8A04" />
-            <span style={{ fontSize: 12, color: '#92400E' }}>{warning}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 10, padding: '7px 12px', background: `${TEAL}0d`, border: `1px solid ${TEAL}30`, borderRadius: 8 }}>
+            <Loader2 size={13} color={TEAL} style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: TEAL_DARK }}>{warning}</span>
           </div>
         )}
       </div>
