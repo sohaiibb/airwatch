@@ -291,6 +291,13 @@ def main():
                 # Map records
                 rows = [parse_record(r, station_id, field_mapping) for r in records]
 
+                # Deduplicate by timestamp within this chunk (API sometimes returns
+                # duplicate timestamps — PostgreSQL ON CONFLICT rejects intra-batch dupes)
+                seen_ts = {}
+                for row in rows:
+                    seen_ts[row["timestamp"]] = row  # last one wins
+                rows = list(seen_ts.values())
+
                 # Upsert in batches
                 chunk_imported = 0
                 chunk_errors   = 0
