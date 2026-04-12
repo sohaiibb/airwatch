@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { FileText, Download, Loader2, Clock, Trash2, Printer, Eye } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { jsPDF } from 'jspdf';
+import { applyPlugin } from 'jspdf-autotable';
+applyPlugin(jsPDF);
 import { getStations, getReadingsByDateRange } from '../lib/supabase';
 import { glass, glassInner, generateDemoHistory } from '../lib/utils';
 
@@ -692,7 +693,12 @@ export default function Reports({ profile }) {
     const isDaily = (new Date(toDT) - new Date(fromDT)) / 3600000 > 7 * 24;
     const rows    = isDaily ? buildDailyRows(readings) : buildHourlyRows(readings);
     const genAt   = report?.generatedAt || new Date().toISOString();
-    exportPDF(rows, readings, station.name, fromISO, toISO, genAt, isDaily);
+    try {
+      exportPDF(rows, readings, station.name, fromISO, toISO, genAt, isDaily);
+    } catch (err) {
+      console.error('PDF generation failed:', err);
+      setError('PDF generation failed: ' + (err?.message || String(err)));
+    }
   }
 
   // Style helpers
