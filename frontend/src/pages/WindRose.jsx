@@ -241,7 +241,7 @@ export default function WindRose({ profile }) {
               )}
 
               {/* Center circle */}
-              <circle cx={CX} cy={CY} r={28} fill="rgba(255,255,255,0.80)" stroke="rgba(255,255,255,0.9)" strokeWidth={1.5} />
+              <circle cx={CX} cy={CY} r={28} fill="var(--glass-inner-bg)" stroke="var(--glass-inner-border)" strokeWidth={1.5} />
               <text x={CX} y={CY - 6} textAnchor="middle" fontSize={14} fontWeight="700" fill="var(--text)" fontFamily="'DM Mono',monospace">{calmPct}%</text>
               <text x={CX} y={CY + 8} textAnchor="middle" fontSize={8} fill="var(--text-muted)" fontFamily="'Instrument Sans',sans-serif" fontWeight="700" letterSpacing="0.08em">CALM</text>
 

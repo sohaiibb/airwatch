@@ -332,18 +332,18 @@ export default function Compliance({ profile }) {
             </thead>
             <tbody>
               {compliance.map((row, i) => {
-                const bg = row.dataPoints === 0 ? '#fff' : row.compliant ? '#F0FDF4' : '#FEF2F2';
+                const bg = row.dataPoints === 0 ? 'var(--bg-card-solid)' : row.compliant ? 'var(--row-compliant-bg)' : 'var(--row-error-bg)';
                 return (
                   <tr key={i} style={{ background: bg }}>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid #F5F5F4', fontWeight: 700, fontFamily: 'Instrument Sans, sans-serif', color: row.color, fontSize: 13 }}>{row.label}</td>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid #F5F5F4', fontSize: 12, fontFamily: 'DM Mono, monospace' }}>{row.unit}</td>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid #F5F5F4', fontSize: 12, fontFamily: 'DM Mono, monospace' }}>{row.period}</td>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid #F5F5F4', fontSize: 12, fontFamily: 'DM Mono, monospace', fontWeight: 700 }}>{row.limit.toLocaleString()}</td>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid #F5F5F4', fontSize: 12, fontFamily: 'DM Mono, monospace' }}>{fmtN(row.avgVal)}</td>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid #F5F5F4', fontSize: 12, fontFamily: 'DM Mono, monospace', color: row.maxVal != null && row.maxVal > row.limit ? '#DC2626' : 'var(--text)', fontWeight: row.maxVal != null && row.maxVal > row.limit ? 700 : 400 }}>{fmtN(row.maxVal)}</td>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid #F5F5F4', fontSize: 12, fontFamily: 'DM Mono, monospace', fontWeight: 700, color: row.exceedCount > 0 ? '#DC2626' : '#16A34A' }}>{row.dataPoints === 0 ? '—' : row.exceedCount}</td>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid #F5F5F4', fontSize: 11, color: 'var(--text-muted)' }}>{row.exceedances || '—'}</td>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid #F5F5F4' }}>
+                    <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontFamily: 'Instrument Sans, sans-serif', color: row.color, fontSize: 13 }}>{row.label}</td>
+                    <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, fontFamily: 'DM Mono, monospace', color: 'var(--text)' }}>{row.unit}</td>
+                    <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, fontFamily: 'DM Mono, monospace', color: 'var(--text)' }}>{row.period}</td>
+                    <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, fontFamily: 'DM Mono, monospace', fontWeight: 700, color: 'var(--text)' }}>{row.limit.toLocaleString()}</td>
+                    <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, fontFamily: 'DM Mono, monospace', color: 'var(--text)' }}>{fmtN(row.avgVal)}</td>
+                    <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, fontFamily: 'DM Mono, monospace', color: row.maxVal != null && row.maxVal > row.limit ? '#DC2626' : 'var(--text)', fontWeight: row.maxVal != null && row.maxVal > row.limit ? 700 : 400 }}>{fmtN(row.maxVal)}</td>
+                    <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, fontFamily: 'DM Mono, monospace', fontWeight: 700, color: row.exceedCount > 0 ? '#DC2626' : '#16A34A' }}>{row.dataPoints === 0 ? '—' : row.exceedCount}</td>
+                    <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', fontSize: 11, color: 'var(--text-muted)' }}>{row.exceedances || '—'}</td>
+                    <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
                       {row.dataPoints === 0
                         ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text-faint)', background: 'rgba(168,162,158,0.12)', padding: '3px 10px', borderRadius: 20 }}>No data</span>
                         : row.compliant

@@ -499,13 +499,13 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt, avgPeriod,
     padding: '5px 9px',
     fontSize: 12,
     fontFamily: 'DM Mono, monospace',
-    borderBottom: '1px solid #f0f0f0',
-    background: i % 2 === 0 ? '#ffffff' : '#f9fafb',
-    color: '#1a1a1a',
+    borderBottom: '1px solid var(--border)',
+    background: i % 2 === 0 ? 'var(--bg-card-solid)' : 'var(--bg-secondary)',
+    color: 'var(--text)',
   });
 
   return (
-    <div id="aw-report" style={{ fontFamily: 'Instrument Sans, sans-serif', color: 'var(--text)', background: '#fff', maxWidth: 1080, margin: '0 auto' }}>
+    <div id="aw-report" style={{ fontFamily: 'Instrument Sans, sans-serif', color: 'var(--text)', background: 'var(--bg-card-solid)', maxWidth: 1080, margin: '0 auto' }}>
 
       {/* ── 1. Header ── */}
       <div style={{ padding: isMobile ? '12px 0 10px' : '20px 0 14px', marginBottom: 16, borderBottom: `3px solid ${TEAL}` }}>
@@ -535,7 +535,7 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt, avgPeriod,
       </div>
 
       {/* ── 2. Summary Row ── */}
-      <div style={{ display: 'flex', gap: 24, marginBottom: 18, padding: '10px 14px', background: TEAL_SOFT, border: `1px solid ${TEAL_MID}`, borderRadius: 8, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 24, marginBottom: 18, padding: '10px 14px', background: 'var(--teal-soft)', border: '1px solid var(--teal-mid)', borderRadius: 8, flexWrap: 'wrap' }}>
         {[
           { label: 'Data Points',   value: readings.length },
           { label: `Period (${avgPeriodUnit(avgPeriod)})`, value: tableRows.length },
@@ -599,7 +599,7 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt, avgPeriod,
                     </tr>
                   ) : tableRows.map((r, i) => (
                     <tr key={i}>
-                      <td style={{ ...tdStyle(i), fontWeight: 500, whiteSpace: 'nowrap', color: '#374151' }}>
+                      <td style={{ ...tdStyle(i), fontWeight: 500, whiteSpace: 'nowrap' }}>
                         {fmtRowLabel(r.timestamp, avgPeriod)}
                       </td>
                       {activeCols.map(c => (
@@ -613,7 +613,7 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt, avgPeriod,
               </table>
 
               {/* Divider label */}
-              <div style={{ padding: '5px 9px', background: TEAL_SOFT, borderTop: `2px solid ${TEAL}`, borderBottom: `1px solid ${TEAL_MID}`, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ padding: '5px 9px', background: 'var(--teal-soft)', borderTop: `2px solid ${TEAL}`, borderBottom: '1px solid var(--teal-mid)', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ width: 3, height: 10, background: TEAL, borderRadius: 2, display: 'inline-block' }} />
                 <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)' }}>Statistical Analysis</span>
                 <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>(based on all raw readings)</span>
@@ -635,10 +635,10 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt, avgPeriod,
                 </thead>
                 <tbody>
                   {statRows.map((row, i) => (
-                    <tr key={row.label} style={{ background: i % 2 === 0 ? '#ffffff' : '#f9fafb' }}>
-                      <td style={{ padding: '7px 9px', fontSize: 12, fontWeight: 700, color: 'var(--text)', fontFamily: 'Instrument Sans, sans-serif', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>{row.label}</td>
+                    <tr key={row.label} style={{ background: i % 2 === 0 ? 'var(--bg-card-solid)' : 'var(--bg-secondary)' }}>
+                      <td style={{ padding: '7px 9px', fontSize: 12, fontWeight: 700, color: 'var(--text)', fontFamily: 'Instrument Sans, sans-serif', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{row.label}</td>
                       {statsPerCol.map(({ c, s }) => (
-                        <td key={c.key} style={{ padding: '7px 9px', fontSize: 12, fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0', color: 'var(--text)', textAlign: 'right' }}>
+                        <td key={c.key} style={{ padding: '7px 9px', fontSize: 12, fontFamily: 'DM Mono, monospace', borderBottom: '1px solid var(--border)', color: 'var(--text)', textAlign: 'right' }}>
                           {row.fn({ c, s })}
                         </td>
                       ))}
@@ -652,7 +652,7 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt, avgPeriod,
       })()}
 
       {/* ── 5. Footer ── */}
-      <div style={{ borderTop: `1px solid #e5e7eb`, paddingTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
+      <div style={{ borderTop: '1px solid var(--border-solid)', paddingTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
         <div>
           <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', margin: '0 0 2px' }}>Hills and Field Company Limited</p>
           <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: 0 }}>
@@ -1095,8 +1095,8 @@ export default function Reports({ profile }) {
             </div>
           </div>
 
-          {/* Report — clean white container */}
-          <div style={{ background: '#fff', border: '1px solid #E7E5E4', borderRadius: 12, padding: isMobile ? '16px 12px' : '28px 32px', boxShadow: '0 2px 16px rgba(0,0,0,0.06)', overflowX: 'auto' }}>
+          {/* Report container */}
+          <div style={{ background: 'var(--bg-card-solid)', border: '1px solid var(--border-solid)', borderRadius: 12, padding: isMobile ? '16px 12px' : '28px 32px', boxShadow: '0 2px 16px rgba(0,0,0,0.06)', overflowX: 'auto' }}>
             <ReportView
               station={report.station}
               fromISO={report.fromISO}

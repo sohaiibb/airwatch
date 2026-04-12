@@ -51,13 +51,13 @@ function NavItem({ item, active, onClick, collapsed }) {
     <button onClick={onClick} title={collapsed ? item.label : undefined} style={{
       display: 'flex', alignItems: 'center', gap: 10, width: '100%',
       padding: collapsed ? '10px 14px' : '10px 12px', borderRadius: 12, border: 'none',
-      background: active ? 'rgba(255,255,255,0.50)' : 'transparent',
+      background: active ? 'var(--glass-inner-bg)' : 'transparent',
       cursor: 'pointer', color: active ? 'var(--text)' : 'var(--text-muted)',
       fontSize: 13, fontWeight: active ? 600 : 500, fontFamily: 'var(--font)',
-      transition: 'all 0.2s', boxShadow: active ? '0 1px 4px rgba(0,0,0,0.04)' : 'none',
+      transition: 'all 0.2s', boxShadow: active ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
     }}
-      onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.30)'; }}
-      onMouseLeave={e => { if (!active) e.currentTarget.style.background = active ? 'rgba(255,255,255,0.50)' : 'transparent'; }}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--glass-inner-bg)'; }}
+      onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
     >
       <Icon size={18} />{!collapsed && item.label}
     </button>
@@ -145,7 +145,7 @@ function AppInner({ profile, session, onLogout }) {
       {/* Mobile hamburger */}
       {isMobile && (
         <button onClick={() => setSidebarOpen(true)} style={{ display: sidebarOpen ? 'none' : 'flex', position: 'fixed', top: 14, left: 14, zIndex: 40, width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', ...glassInner(), border: '1px solid rgba(255,255,255,0.5)', cursor: 'pointer' }}>
-          <Menu size={18} color="#44403C" />
+          <Menu size={18} color="var(--text-mid)" />
         </button>
       )}
 
@@ -156,13 +156,13 @@ function AppInner({ profile, session, onLogout }) {
 
       {/* Sidebar */}
       <aside style={{
-        ...glass({ borderRadius: 0, border: 'none', borderRight: '1px solid rgba(255,255,255,0.4)' }),
+        ...glass({ borderRadius: 0, border: 'none', borderRight: '1px solid var(--border)', background: 'var(--sidebar-bg)' }),
         width: isMobile ? 240 : (sidebarOpen ? 240 : 64),
         transform: isMobile ? (sidebarOpen ? 'translateX(0)' : 'translateX(-100%)') : 'translateX(0)',
         transition: isMobile ? 'transform 0.3s cubic-bezier(.16,1,.3,1)' : 'width 0.3s cubic-bezier(.16,1,.3,1)',
         display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, bottom: 0, left: 0, zIndex: 30, overflow: 'hidden',
       }}>
-        <div style={{ padding: sidebarOpen ? '20px 20px 16px' : '20px 14px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid rgba(255,255,255,0.3)' }}>
+        <div style={{ padding: sidebarOpen ? '20px 20px 16px' : '20px 14px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid var(--border)' }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, rgba(16,185,129,0.75), rgba(6,182,212,0.75))', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.5)', flexShrink: 0 }}>
             <Wind size={18} color="#fff" />
           </div>
@@ -170,7 +170,7 @@ function AppInner({ profile, session, onLogout }) {
         </div>
 
         <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{ position: 'absolute', top: 22, right: -12, width: 24, height: 24, borderRadius: '50%', ...glassInner(), display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.5)', zIndex: 2 }}>
-          <ChevronRight size={12} color="#78716C" style={{ transform: sidebarOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s' }} />
+          <ChevronRight size={12} color="var(--text-muted)" style={{ transform: sidebarOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s' }} />
         </button>
 
         <nav style={{ flex: 1, padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>
@@ -178,12 +178,12 @@ function AppInner({ profile, session, onLogout }) {
           {navItems.map(i => <NavItem key={i.id} item={i} active={page === i.id} onClick={() => navigate(i.id)} collapsed={!sidebarOpen} />)}
           {showAdminNav && <>
             {sidebarOpen && <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-faint)', letterSpacing: '0.08em', textTransform: 'uppercase', padding: '16px 12px 4px' }}>ADMIN</p>}
-            {!sidebarOpen && <div style={{ borderTop: '1px solid rgba(255,255,255,0.3)', margin: '8px 4px' }} />}
+            {!sidebarOpen && <div style={{ borderTop: '1px solid var(--border)', margin: '8px 4px' }} />}
             {NAV_ADMIN.map(i => <NavItem key={i.id} item={i} active={page === i.id} onClick={() => navigate(i.id)} collapsed={!sidebarOpen} />)}
           </>}
         </nav>
 
-        <div style={{ padding: '12px 8px', borderTop: '1px solid rgba(255,255,255,0.3)' }}>
+        <div style={{ padding: '12px 8px', borderTop: '1px solid var(--border)' }}>
           {sidebarOpen && (
             <div style={{ padding: '8px 12px', marginBottom: 4 }}>
               <p style={{ fontSize: 13, fontWeight: 600 }}>{profile?.full_name || 'User'}</p>

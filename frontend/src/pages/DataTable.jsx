@@ -93,16 +93,16 @@ function getCellStyle(key, value, rowIdx) {
   const base = {
     padding: '5px 10px', fontSize: 12,
     fontFamily: 'DM Mono, monospace',
-    borderBottom: '1px solid rgba(0,0,0,0.05)',
+    borderBottom: '1px solid var(--border)',
     textAlign: 'right',
-    background: rowIdx % 2 === 0 ? '#ffffff' : '#f8fafc',
+    background: rowIdx % 2 === 0 ? 'var(--bg-card-solid)' : 'var(--bg-secondary)',
     color: 'var(--text)',
   };
   const t = THRESHOLDS[key];
   if (!t || value == null || isNaN(Number(value))) return base;
   const v = Number(value);
-  if (v >= t.red)    return { ...base, background: 'rgba(220,38,38,0.10)', color: '#B91C1C', fontWeight: 600 };
-  if (v >= t.yellow) return { ...base, background: 'rgba(234,179,8,0.09)', color: '#92400E' };
+  if (v >= t.red)    return { ...base, background: 'rgba(220,38,38,0.12)', color: 'var(--cell-error-text)', fontWeight: 600 };
+  if (v >= t.yellow) return { ...base, background: 'rgba(234,179,8,0.10)', color: 'var(--cell-warn-text)' };
   return base;
 }
 
@@ -884,9 +884,9 @@ export default function DataTable({ profile }) {
                     <td style={{
                       padding: '5px 10px 5px 16px', fontSize: 12,
                       fontFamily: 'DM Mono, monospace',
-                      borderBottom: '1px solid rgba(0,0,0,0.05)',
-                      background: i % 2 === 0 ? '#ffffff' : '#f8fafc',
-                      color: '#374151', fontWeight: 500, whiteSpace: 'nowrap',
+                      borderBottom: '1px solid var(--border)',
+                      background: i % 2 === 0 ? 'var(--bg-card-solid)' : 'var(--bg-secondary)',
+                      color: 'var(--text)', fontWeight: 500, whiteSpace: 'nowrap',
                       position: 'sticky', left: 0, zIndex: 1,
                     }}>
                       {fmtTSAgg(r.timestamp, agg)}
@@ -907,8 +907,8 @@ export default function DataTable({ profile }) {
         {!loading && totalCount > PAGE_SIZE && (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '10px 16px', borderTop: '1px solid rgba(0,0,0,0.06)',
-            background: 'rgba(255,255,255,0.5)',
+            padding: '10px 16px', borderTop: '1px solid var(--border)',
+            background: 'var(--glass-inner-bg)',
           }}>
             <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Mono, monospace' }}>
               Page {page + 1} of {totalPages.toLocaleString()}
