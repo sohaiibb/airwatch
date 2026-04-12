@@ -828,7 +828,7 @@ export default function DataTable({ profile }) {
       </div>
 
       {/* ── Data table ── */}
-      <div style={{ ...glass({ padding: 0 }), overflow: 'hidden', animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.1s both' }}>
+      <div style={{ ...glass({ padding: 0 }), animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.1s both', position: 'relative' }}>
 
         {loading ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 24px', gap: 12 }}>
@@ -842,8 +842,8 @@ export default function DataTable({ profile }) {
             <p style={{ fontSize: 12, color: '#A8A29E', margin: 0 }}>Try a different date range, station, or aggregation.</p>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1000, tableLayout: 'auto' }}>
+          <div data-scroll-x style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%', position: 'relative' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900, tableLayout: 'auto' }}>
               <thead>
                 <tr>
                   {/* Timestamp header */}

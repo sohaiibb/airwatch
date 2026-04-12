@@ -321,7 +321,7 @@ export default function Compliance({ profile }) {
             <p style={{ fontSize: 11, marginTop: 4 }}>Try selecting 1-Hour or 24-Hour.</p>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <div data-scroll-x style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
             <thead>
               <tr>

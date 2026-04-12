@@ -455,7 +455,7 @@ function exportPDF(rows, readings, station, fromISO, toISO, generatedAt, activeC
 // ReportView — clean white, printable
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ReportView({ station, fromISO, toISO, readings, generatedAt, avgPeriod, activeCols }) {
+function ReportView({ station, fromISO, toISO, readings, generatedAt, avgPeriod, activeCols, isMobile = false }) {
   const printStyleRef = useRef(null);
 
   useEffect(() => {
@@ -508,10 +508,10 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt, avgPeriod,
     <div id="aw-report" style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#1C1917', background: '#fff', maxWidth: 1080, margin: '0 auto' }}>
 
       {/* ── 1. Header ── */}
-      <div style={{ padding: '20px 0 14px', marginBottom: 16, borderBottom: `3px solid ${TEAL}` }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 5px', letterSpacing: '-0.01em', color: '#1C1917' }}>
+      <div style={{ padding: isMobile ? '12px 0 10px' : '20px 0 14px', marginBottom: 16, borderBottom: `3px solid ${TEAL}` }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: isMobile ? 8 : 0 }}>
+          <div style={{ flex: '1 1 200px' }}>
+            <h2 style={{ fontSize: isMobile ? 15 : 18, fontWeight: 700, margin: '0 0 5px', letterSpacing: '-0.01em', color: '#1C1917' }}>
               Air Quality Monitoring Report
             </h2>
             <p style={{ fontSize: 12, color: '#57534E', margin: '0 0 2px' }}>Station: <strong>{station.name}</strong></p>
@@ -524,12 +524,12 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt, avgPeriod,
               Period: {fmtDT(fromISO)} — {fmtDT(toISO)}
             </p>
           </div>
-          <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 24 }}>
+          <div style={{ textAlign: isMobile ? 'left' : 'right', flexShrink: 0, marginLeft: isMobile ? 0 : 24 }}>
             <p style={{ fontSize: 10, color: '#78716C', margin: '0 0 2px' }}>Generated</p>
             <p style={{ fontSize: 11, fontWeight: 600, color: '#1C1917', margin: 0, fontFamily: 'DM Mono, monospace' }}>
               {fmtDT(generatedAt)}
             </p>
-            <p style={{ fontSize: 10, color: '#78716C', margin: '4px 0 0' }}>Hills and Field AirWatch Monitoring Dashboard</p>
+            <p style={{ fontSize: 10, color: '#78716C', margin: '4px 0 0' }}>Hills and Field AirWatch</p>
           </div>
         </div>
       </div>
@@ -575,9 +575,9 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt, avgPeriod,
               <span style={{ fontSize: 10, fontWeight: 400, color: '#78716C' }}>({tableRows.length} {avgPeriodUnit(avgPeriod)})</span>
             </h3>
 
-            <div className="pb" style={{ overflowX: 'auto' }}>
+            <div className="pb" data-scroll-x style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', position: 'relative' }}>
               {/* Data rows table */}
-              <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', minWidth: 500 }}>
+              <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', minWidth: Math.max(600, 140 + activeCols.length * 80) }}>
                 {colGroup}
                 <thead>
                   <tr>
@@ -652,7 +652,7 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt, avgPeriod,
       })()}
 
       {/* ── 5. Footer ── */}
-      <div style={{ borderTop: `1px solid #e5e7eb`, paddingTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div style={{ borderTop: `1px solid #e5e7eb`, paddingTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
         <div>
           <p style={{ fontSize: 11, fontWeight: 700, color: '#1C1917', margin: '0 0 2px' }}>Hills and Field Company Limited</p>
           <p style={{ fontSize: 10, color: '#78716C', margin: 0 }}>
@@ -1105,6 +1105,7 @@ export default function Reports({ profile }) {
               generatedAt={report.generatedAt}
               avgPeriod={report.avgPeriod}
               activeCols={reportActiveCols}
+              isMobile={isMobile}
             />
           </div>
         </div>
