@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { FileText, Download, Loader2, Clock, Trash2, Printer, Eye } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 import { getStations, getReadingsByDateRange } from '../lib/supabase';
 import { glass, glassInner, generateDemoHistory } from '../lib/utils';
 
@@ -166,6 +168,200 @@ function exportExcel(rows, stationName, fromStr, toStr, isDaily) {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Data');
   XLSX.writeFile(wb, `${stationName.replace(/\s+/g,'_')}_${fromStr}_${toStr}.xlsx`);
+}
+
+// ── PDF export (jsPDF + autoTable) ───────────────────────────────────────────
+function exportPDF(rows, readings, stationName, fromISO, toISO, generatedAt, isDaily) {
+  const doc      = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const PW       = doc.internal.pageSize.getWidth();   // 210
+  const PH       = doc.internal.pageSize.getHeight();  // 297
+  const ML = 15, MR = 15, MT = 15;
+  const CW       = PW - ML - MR;                        // content width
+  const TEAL_RGB = [13, 148, 136];
+  const GRAY     = [100, 100, 100];
+  const BLACK    = [28, 25, 23];
+
+  const fromStr = fromISO.slice(0, 10);
+  const toStr   = toISO.slice(0, 10);
+  const filename = `AirWatch_${stationName.replace(/\s+/g,'_')}_${fromStr}_${toStr}.pdf`;
+
+  // ── Footer helper (called after each autoTable page) ──────────────────────
+  function addFooters() {
+    const total = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= total; i++) {
+      doc.setPage(i);
+      const y = PH - 8;
+      doc.setFontSize(7);
+      doc.setTextColor(...GRAY);
+      // Left
+      doc.text('Hills and Field Company Limited', ML, y);
+      // Center
+      doc.text(`Page ${i} of ${total}`, PW / 2, y, { align: 'center' });
+      // Right
+      doc.text(`Station: ${stationName}  |  Period: ${fromStr} – ${toStr}`, PW - MR, y, { align: 'right' });
+    }
+  }
+
+  // ── Page 1 header ─────────────────────────────────────────────────────────
+  let y = MT;
+
+  // Company name
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...TEAL_RGB);
+  doc.text('HILLS AND FIELD COMPANY LIMITED', ML, y);
+  y += 7;
+
+  // Report title (left) + generated (right)
+  doc.setFontSize(16);
+  doc.setTextColor(...BLACK);
+  doc.text('Air Quality Monitoring Report', ML, y);
+
+  // Generated block — right-aligned, starts at same y
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...GRAY);
+  const genLines = [
+    'Generated',
+    fmtDT(generatedAt),
+    'AirWatch Monitoring Platform',
+  ];
+  genLines.forEach((line, i) => {
+    doc.text(line, PW - MR, MT + 7 + i * 4, { align: 'right' });
+  });
+
+  y += 6;
+
+  // Station + period
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...BLACK);
+  doc.text(`Station: ${stationName}`, ML, y);
+  y += 5;
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...GRAY);
+  doc.text(`Period: ${fmtDT(fromISO)}  —  ${fmtDT(toISO)}`, ML, y);
+  y += 6;
+
+  // Teal separator line
+  doc.setDrawColor(...TEAL_RGB);
+  doc.setLineWidth(0.6);
+  doc.line(ML, y, PW - MR, y);
+  y += 5;
+
+  // ── Summary line ──────────────────────────────────────────────────────────
+  const spanHours  = (new Date(toISO) - new Date(fromISO)) / 3600000;
+  const expected   = isDaily ? Math.max(1, Math.round(spanHours / 24)) : Math.max(1, Math.round(spanHours));
+  const capPct     = Math.min(100, Math.round((rows.length / expected) * 100));
+  const avgLabel   = isDaily ? 'Daily averages' : 'Hourly averages';
+
+  doc.setFontSize(8);
+  doc.setTextColor(...GRAY);
+  doc.setFont('helvetica', 'normal');
+  doc.text(
+    `Data Points: ${readings.length}   |   Period: ${rows.length} ${isDaily ? 'days' : 'hours'}   |   Data Capture: ${capPct}%   |   Averaging: ${avgLabel}`,
+    ML, y
+  );
+  y += 7;
+
+  // ── Data table ────────────────────────────────────────────────────────────
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...BLACK);
+  doc.text(isDaily ? 'Daily Averaged Data' : 'Hourly Averaged Data', ML, y);
+  y += 4;
+
+  // Column headers: ASCII-safe (no subscripts/superscripts)
+  const dataHead = [['Date / Time', 'PM2.5\nug/m3', 'PM10\nug/m3', 'SO2\nug/m3', 'NO2\nug/m3', 'O3\nug/m3', 'CO\nug/m3', 'Temp\n°C', 'RH\n%', 'WS\nm/s', 'WD\n°', 'N']];
+  const dataBody = rows.map(r => [
+    isDaily ? fmtDayLabel(r.timestamp) : fmtHourLabel(r.timestamp),
+    ...COLS.map(c => r[c.key] != null ? Number(r[c.key]).toFixed(c.dp) : '—'),
+    String(r.n),
+  ]);
+
+  doc.autoTable({
+    head:      dataHead,
+    body:      dataBody,
+    startY:    y,
+    margin:    { left: ML, right: MR, bottom: 14 },
+    tableWidth: CW,
+    styles:          { fontSize: 7, cellPadding: 1.8, overflow: 'linebreak', valign: 'middle', textColor: [...BLACK] },
+    headStyles:      { fillColor: TEAL_RGB, textColor: [255,255,255], fontStyle: 'bold', fontSize: 7, halign: 'center' },
+    columnStyles:    {
+      0: { cellWidth: 32, halign: 'left' },
+      1: { cellWidth: 16, halign: 'right' },
+      2: { cellWidth: 16, halign: 'right' },
+      3: { cellWidth: 14, halign: 'right' },
+      4: { cellWidth: 14, halign: 'right' },
+      5: { cellWidth: 14, halign: 'right' },
+      6: { cellWidth: 18, halign: 'right' },
+      7: { cellWidth: 14, halign: 'right' },
+      8: { cellWidth: 12, halign: 'right' },
+      9: { cellWidth: 12, halign: 'right' },
+      10:{ cellWidth: 10, halign: 'right' },
+      11:{ cellWidth: 8,  halign: 'right' },
+    },
+    alternateRowStyles: { fillColor: [240, 253, 250] },
+    didDrawPage: (data) => {
+      // Teal stripe at top of continuation pages
+      if (data.pageNumber > 1) {
+        doc.setFillColor(...TEAL_RGB);
+        doc.rect(0, 0, PW, 5, 'F');
+      }
+    },
+  });
+
+  // ── Descriptive statistics table ──────────────────────────────────────────
+  const statsY = doc.lastAutoTable.finalY + 10;
+  const statsCols = ['Parameter', 'Unit', 'N', 'Mean', 'Min', 'Max', 'Std Dev', 'P98'];
+  const statsBody = COLS.map(c => {
+    const vals = readings.map(r => r[c.key]).filter(v => v != null && !isNaN(Number(v))).map(Number);
+    if (!vals.length) return [c.label, c.unit, '0', '—', '—', '—', '—', '—'];
+    const sorted = [...vals].sort((a, b) => a - b);
+    const mean   = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const sd     = vals.length > 1
+      ? Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length)
+      : null;
+    const p98idx = Math.ceil(0.98 * sorted.length) - 1;
+    const p98val = sorted[Math.max(0, Math.min(p98idx, sorted.length - 1))];
+    return [
+      c.label, c.unit, String(vals.length),
+      mean.toFixed(c.dp),
+      sorted[0].toFixed(c.dp),
+      sorted[sorted.length - 1].toFixed(c.dp),
+      sd != null ? sd.toFixed(c.dp) : '—',
+      p98val.toFixed(c.dp),
+    ];
+  });
+
+  // Section heading before stats table
+  const needsNewPage = statsY + 50 > PH - 20;
+  if (needsNewPage) doc.addPage();
+  const sY = needsNewPage ? MT : statsY;
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...BLACK);
+  doc.text('Descriptive Statistics', ML, sY);
+
+  doc.autoTable({
+    head:      [statsCols],
+    body:      statsBody,
+    startY:    sY + 4,
+    margin:    { left: ML, right: MR, bottom: 14 },
+    tableWidth: CW,
+    styles:          { fontSize: 8, cellPadding: 2.2, textColor: [...BLACK] },
+    headStyles:      { fillColor: TEAL_RGB, textColor: [255,255,255], fontStyle: 'bold', fontSize: 8 },
+    columnStyles:    { 0: { fontStyle: 'bold' } },
+    alternateRowStyles: { fillColor: [240, 253, 250] },
+  });
+
+  // ── Add footers to all pages ───────────────────────────────────────────────
+  addFooters();
+
+  doc.save(filename);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -488,8 +684,15 @@ export default function Reports({ profile }) {
   }
 
   async function handlePDF() {
-    if (!report) { await handlePreview(); }
-    setTimeout(() => window.print(), 300);
+    const readings = report?.readings || await loadData();
+    if (!readings) return;
+    const station = stations.find(s => s.id === stationId) || { name: 'Unknown' };
+    const fromISO = new Date(fromDT).toISOString();
+    const toISO   = new Date(toDT).toISOString();
+    const isDaily = (new Date(toDT) - new Date(fromDT)) / 3600000 > 7 * 24;
+    const rows    = isDaily ? buildDailyRows(readings) : buildHourlyRows(readings);
+    const genAt   = report?.generatedAt || new Date().toISOString();
+    exportPDF(rows, readings, station.name, fromISO, toISO, genAt, isDaily);
   }
 
   // Style helpers
@@ -652,8 +855,8 @@ export default function Reports({ profile }) {
               <button onClick={() => handleExcel()} style={{ ...actionBtn(false), padding: '7px 14px' }}>
                 <Download size={12} />Excel
               </button>
-              <button onClick={() => window.print()} style={{ ...actionBtn(true), padding: '7px 16px' }}>
-                <Printer size={13} />Save as PDF
+              <button onClick={handlePDF} style={{ ...actionBtn(true), padding: '7px 16px' }}>
+                <Printer size={13} />Download PDF
               </button>
             </div>
           </div>
