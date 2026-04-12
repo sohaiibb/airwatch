@@ -17,16 +17,16 @@ const TEAL_SOFT = '#f0fdfa';
 const TEAL_MID  = '#ccfbf1';
 
 const COLS = [
-  { key: 'pm25',          label: 'PM₂.₅',   unit: 'µg/m³', dp: 1 },
-  { key: 'pm10',          label: 'PM₁₀',    unit: 'µg/m³', dp: 1 },
-  { key: 'so2',           label: 'SO₂',     unit: 'µg/m³', dp: 1 },
-  { key: 'no2',           label: 'NO₂',     unit: 'µg/m³', dp: 1 },
-  { key: 'o3',            label: 'O₃',      unit: 'µg/m³', dp: 1 },
-  { key: 'co',            label: 'CO',      unit: 'µg/m³', dp: 0 },
-  { key: 'temperature',   label: 'Temp',    unit: '°C',    dp: 1 },
-  { key: 'humidity',      label: 'RH',      unit: '%',     dp: 1 },
-  { key: 'wind_speed',    label: 'WS',      unit: 'm/s',   dp: 1 },
-  { key: 'wind_direction',label: 'WD',      unit: '°',     dp: 0 },
+  { key: 'pm25',          label: 'PM₂.₅',   pdfLabel: 'PM2.5', unit: 'µg/m³', dp: 1 },
+  { key: 'pm10',          label: 'PM₁₀',    pdfLabel: 'PM10',  unit: 'µg/m³', dp: 1 },
+  { key: 'so2',           label: 'SO₂',     pdfLabel: 'SO2',   unit: 'µg/m³', dp: 1 },
+  { key: 'no2',           label: 'NO₂',     pdfLabel: 'NO2',   unit: 'µg/m³', dp: 1 },
+  { key: 'o3',            label: 'O₃',      pdfLabel: 'O3',    unit: 'µg/m³', dp: 1 },
+  { key: 'co',            label: 'CO',      pdfLabel: 'CO',    unit: 'µg/m³', dp: 0 },
+  { key: 'temperature',   label: 'Temp',    pdfLabel: 'Temp',  unit: '°C',    dp: 1 },
+  { key: 'humidity',      label: 'RH',      pdfLabel: 'RH',    unit: '%',     dp: 1 },
+  { key: 'wind_speed',    label: 'WS',      pdfLabel: 'WS',    unit: 'm/s',   dp: 1 },
+  { key: 'wind_direction',label: 'WD',      pdfLabel: 'WD',    unit: '°',     dp: 0 },
 ];
 
 function fmt(v, dp = 1) {
@@ -43,7 +43,6 @@ function fmtDT(s) {
     hour: '2-digit', minute: '2-digit', hour12: false,
   });
 }
-// For the hourly row label: "12 Apr 2026  14:00"
 function fmtHourLabel(isoStr) {
   const d = new Date(isoStr);
   return d.toLocaleString('en-GB', {
@@ -51,7 +50,6 @@ function fmtHourLabel(isoStr) {
     hour: '2-digit', minute: '2-digit', hour12: false,
   });
 }
-// For the daily row label: "12 Apr 2026"
 function fmtDayLabel(isoStr) {
   return new Date(isoStr).toLocaleDateString('en-GB', {
     day: '2-digit', month: 'short', year: 'numeric',
@@ -71,7 +69,7 @@ function buildHourlyRows(readings) {
   return Object.entries(buckets)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([iso, recs]) => {
-      const row = { timestamp: iso, n: recs.length };
+      const row = { timestamp: iso };
       COLS.forEach(c => {
         const vals = recs.map(r => r[c.key]).filter(v => v != null && !isNaN(Number(v))).map(Number);
         row[c.key] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
@@ -91,7 +89,7 @@ function buildDailyRows(readings) {
   return Object.entries(buckets)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([day, recs]) => {
-      const row = { timestamp: day + 'T00:00:00.000Z', n: recs.length };
+      const row = { timestamp: day + 'T00:00:00.000Z' };
       COLS.forEach(c => {
         const vals = recs.map(r => r[c.key]).filter(v => v != null && !isNaN(Number(v))).map(Number);
         row[c.key] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
@@ -100,7 +98,7 @@ function buildDailyRows(readings) {
     });
 }
 
-// ── Descriptive statistics ────────────────────────────────────────────────────
+// ── Statistical analysis ──────────────────────────────────────────────────────
 function stdDev(vals) {
   if (vals.length < 2) return null;
   const m = vals.reduce((a, b) => a + b, 0) / vals.length;
@@ -135,19 +133,18 @@ const PRESETS = [
 ];
 
 function toLocalInput(d) {
-  // Returns "YYYY-MM-DDTHH:MM" for datetime-local input
   const pad = n => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 // ── CSV export ────────────────────────────────────────────────────────────────
 function exportCSV(rows, stationName, fromStr, toStr, isDaily) {
-  const headers = ['Date/Time', ...COLS.map(c => `${c.label} (${c.unit})`), 'N'];
+  const headers = ['Date/Time', ...COLS.map(c => `${c.label} (${c.unit})`)];
   const lines   = [headers.join(',')];
   rows.forEach(r => {
     const label = isDaily ? fmtDayLabel(r.timestamp) : fmtHourLabel(r.timestamp);
     const vals  = COLS.map(c => r[c.key] != null ? Number(r[c.key]).toFixed(c.dp) : '');
-    lines.push([`"${label}"`, ...vals, r.n].join(','));
+    lines.push([`"${label}"`, ...vals].join(','));
   });
   const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
   const a    = document.createElement('a');
@@ -158,26 +155,26 @@ function exportCSV(rows, stationName, fromStr, toStr, isDaily) {
 
 // ── Excel export ──────────────────────────────────────────────────────────────
 function exportExcel(rows, stationName, fromStr, toStr, isDaily) {
-  const headers = ['Date/Time', ...COLS.map(c => `${c.label} (${c.unit})`), 'N'];
+  const headers = ['Date/Time', ...COLS.map(c => `${c.label} (${c.unit})`)];
   const data    = rows.map(r => {
     const label = isDaily ? fmtDayLabel(r.timestamp) : fmtHourLabel(r.timestamp);
-    return [label, ...COLS.map(c => r[c.key] != null ? +Number(r[c.key]).toFixed(c.dp) : null), r.n];
+    return [label, ...COLS.map(c => r[c.key] != null ? +Number(r[c.key]).toFixed(c.dp) : null)];
   });
   const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
-  // Column widths
-  ws['!cols'] = [{ wch: 22 }, ...COLS.map(() => ({ wch: 10 })), { wch: 5 }];
+  ws['!cols'] = [{ wch: 22 }, ...COLS.map(() => ({ wch: 10 }))];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Data');
   XLSX.writeFile(wb, `${stationName.replace(/\s+/g,'_')}_${fromStr}_${toStr}.xlsx`);
 }
 
 // ── PDF export (jsPDF + autoTable) ───────────────────────────────────────────
-function exportPDF(rows, readings, stationName, fromISO, toISO, generatedAt, isDaily) {
+function exportPDF(rows, readings, station, fromISO, toISO, generatedAt, isDaily) {
+  const stationName = station.name || 'Unknown';
   const doc      = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const PW       = doc.internal.pageSize.getWidth();   // 210
-  const PH       = doc.internal.pageSize.getHeight();  // 297
+  const PW       = doc.internal.pageSize.getWidth();
+  const PH       = doc.internal.pageSize.getHeight();
   const ML = 15, MR = 15, MT = 15;
-  const CW       = PW - ML - MR;                        // content width
+  const CW       = PW - ML - MR;
   const TEAL_RGB = [13, 148, 136];
   const GRAY     = [100, 100, 100];
   const BLACK    = [28, 25, 23];
@@ -186,7 +183,6 @@ function exportPDF(rows, readings, stationName, fromISO, toISO, generatedAt, isD
   const toStr   = toISO.slice(0, 10);
   const filename = `AirWatch_${stationName.replace(/\s+/g,'_')}_${fromStr}_${toStr}.pdf`;
 
-  // ── Footer helper (called after each autoTable page) ──────────────────────
   function addFooters() {
     const total = doc.internal.getNumberOfPages();
     for (let i = 1; i <= total; i++) {
@@ -194,11 +190,8 @@ function exportPDF(rows, readings, stationName, fromISO, toISO, generatedAt, isD
       const y = PH - 8;
       doc.setFontSize(7);
       doc.setTextColor(...GRAY);
-      // Left
       doc.text('Hills and Field Company Limited', ML, y);
-      // Center
       doc.text(`Page ${i} of ${total}`, PW / 2, y, { align: 'center' });
-      // Right
       doc.text(`Station: ${stationName}  |  Period: ${fromStr} – ${toStr}`, PW - MR, y, { align: 'right' });
     }
   }
@@ -206,40 +199,44 @@ function exportPDF(rows, readings, stationName, fromISO, toISO, generatedAt, isD
   // ── Page 1 header ─────────────────────────────────────────────────────────
   let y = MT;
 
-  // Company name
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...TEAL_RGB);
-  doc.text('HILLS AND FIELD COMPANY LIMITED', ML, y);
-  y += 7;
-
-  // Report title (left) + generated (right)
+  // Report title (left)
   doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
   doc.setTextColor(...BLACK);
   doc.text('Air Quality Monitoring Report', ML, y);
 
-  // Generated block — right-aligned, starts at same y
+  // Generated block — right-aligned
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...GRAY);
   const genLines = [
     'Generated',
     fmtDT(generatedAt),
-    'AirWatch Monitoring Platform',
+    'Hills and Field AirWatch Monitoring Dashboard',
   ];
   genLines.forEach((line, i) => {
-    doc.text(line, PW - MR, MT + 7 + i * 4, { align: 'right' });
+    doc.text(line, PW - MR, MT + i * 4, { align: 'right' });
   });
 
   y += 6;
 
-  // Station + period
+  // Station
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...BLACK);
   doc.text(`Station: ${stationName}`, ML, y);
   y += 5;
 
+  // Coordinates (if available)
+  if (station.latitude != null && station.longitude != null) {
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...GRAY);
+    doc.text(`Coordinates: ${Number(station.latitude).toFixed(4)}°N, ${Number(station.longitude).toFixed(4)}°E`, ML, y);
+    y += 5;
+  }
+
+  // Period
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...GRAY);
@@ -274,12 +271,10 @@ function exportPDF(rows, readings, stationName, fromISO, toISO, generatedAt, isD
   doc.text(isDaily ? 'Daily Averaged Data' : 'Hourly Averaged Data', ML, y);
   y += 4;
 
-  // Column headers: ASCII-safe (no subscripts/superscripts)
-  const dataHead = [['Date / Time', 'PM2.5\nug/m3', 'PM10\nug/m3', 'SO2\nug/m3', 'NO2\nug/m3', 'O3\nug/m3', 'CO\nug/m3', 'Temp\n°C', 'RH\n%', 'WS\nm/s', 'WD\n°', 'N']];
+  const dataHead = [['Date / Time', 'PM2.5\nug/m3', 'PM10\nug/m3', 'SO2\nug/m3', 'NO2\nug/m3', 'O3\nug/m3', 'CO\nug/m3', 'Temp\n°C', 'RH\n%', 'WS\nm/s', 'WD\n°']];
   const dataBody = rows.map(r => [
     isDaily ? fmtDayLabel(r.timestamp) : fmtHourLabel(r.timestamp),
     ...COLS.map(c => r[c.key] != null ? Number(r[c.key]).toFixed(c.dp) : '—'),
-    String(r.n),
   ]);
 
   doc.autoTable({
@@ -302,11 +297,9 @@ function exportPDF(rows, readings, stationName, fromISO, toISO, generatedAt, isD
       8: { cellWidth: 12, halign: 'right' },
       9: { cellWidth: 12, halign: 'right' },
       10:{ cellWidth: 10, halign: 'right' },
-      11:{ cellWidth: 8,  halign: 'right' },
     },
     alternateRowStyles: { fillColor: [240, 253, 250] },
     didDrawPage: (data) => {
-      // Teal stripe at top of continuation pages
       if (data.pageNumber > 1) {
         doc.setFillColor(...TEAL_RGB);
         doc.rect(0, 0, PW, 5, 'F');
@@ -314,12 +307,12 @@ function exportPDF(rows, readings, stationName, fromISO, toISO, generatedAt, isD
     },
   });
 
-  // ── Descriptive statistics table ──────────────────────────────────────────
+  // ── Statistical Analysis table ────────────────────────────────────────────
   const statsY = doc.lastAutoTable.finalY + 10;
   const statsCols = ['Parameter', 'Unit', 'N', 'Mean', 'Min', 'Max', 'Std Dev', 'P98'];
   const statsBody = COLS.map(c => {
     const vals = readings.map(r => r[c.key]).filter(v => v != null && !isNaN(Number(v))).map(Number);
-    if (!vals.length) return [c.label, c.unit, '0', '—', '—', '—', '—', '—'];
+    if (!vals.length) return [c.pdfLabel, c.unit, '0', '—', '—', '—', '—', '—'];
     const sorted = [...vals].sort((a, b) => a - b);
     const mean   = vals.reduce((a, b) => a + b, 0) / vals.length;
     const sd     = vals.length > 1
@@ -328,7 +321,7 @@ function exportPDF(rows, readings, stationName, fromISO, toISO, generatedAt, isD
     const p98idx = Math.ceil(0.98 * sorted.length) - 1;
     const p98val = sorted[Math.max(0, Math.min(p98idx, sorted.length - 1))];
     return [
-      c.label, c.unit, String(vals.length),
+      c.pdfLabel, c.unit, String(vals.length),
       mean.toFixed(c.dp),
       sorted[0].toFixed(c.dp),
       sorted[sorted.length - 1].toFixed(c.dp),
@@ -337,7 +330,6 @@ function exportPDF(rows, readings, stationName, fromISO, toISO, generatedAt, isD
     ];
   });
 
-  // Section heading before stats table
   const needsNewPage = statsY + 50 > PH - 20;
   if (needsNewPage) doc.addPage();
   const sY = needsNewPage ? MT : statsY;
@@ -345,7 +337,7 @@ function exportPDF(rows, readings, stationName, fromISO, toISO, generatedAt, isD
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...BLACK);
-  doc.text('Descriptive Statistics', ML, sY);
+  doc.text('Statistical Analysis', ML, sY);
 
   doc.autoTable({
     head:      [statsCols],
@@ -353,15 +345,13 @@ function exportPDF(rows, readings, stationName, fromISO, toISO, generatedAt, isD
     startY:    sY + 4,
     margin:    { left: ML, right: MR, bottom: 14 },
     tableWidth: CW,
-    styles:          { fontSize: 8, cellPadding: 2.2, textColor: [...BLACK] },
-    headStyles:      { fillColor: TEAL_RGB, textColor: [255,255,255], fontStyle: 'bold', fontSize: 8 },
+    styles:          { fontSize: 7, cellPadding: 2.2, textColor: [...BLACK] },
+    headStyles:      { fillColor: TEAL_RGB, textColor: [255,255,255], fontStyle: 'bold', fontSize: 7 },
     columnStyles:    { 0: { fontStyle: 'bold' } },
     alternateRowStyles: { fillColor: [240, 253, 250] },
   });
 
-  // ── Add footers to all pages ───────────────────────────────────────────────
   addFooters();
-
   doc.save(filename);
 }
 
@@ -406,7 +396,7 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt }) {
     background: TEAL,
     color: '#fff',
     fontWeight: 700,
-    fontSize: 10,
+    fontSize: 12,
     textAlign: 'left',
     fontFamily: 'Instrument Sans, sans-serif',
     whiteSpace: 'nowrap',
@@ -414,7 +404,7 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt }) {
   };
   const tdStyle = (i) => ({
     padding: '5px 9px',
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: 'DM Mono, monospace',
     borderBottom: '1px solid #f0f0f0',
     background: i % 2 === 0 ? '#ffffff' : '#f9fafb',
@@ -428,13 +418,15 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt }) {
       <div style={{ padding: '20px 0 14px', marginBottom: 16, borderBottom: `3px solid ${TEAL}` }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.12em', color: TEAL, textTransform: 'uppercase', margin: '0 0 4px' }}>
-              Hills and Field Company Limited
-            </p>
             <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 5px', letterSpacing: '-0.01em', color: '#1C1917' }}>
               Air Quality Monitoring Report
             </h2>
             <p style={{ fontSize: 12, color: '#57534E', margin: '0 0 2px' }}>Station: <strong>{station.name}</strong></p>
+            {station.latitude != null && station.longitude != null && (
+              <p style={{ fontSize: 11, color: '#78716C', margin: '0 0 2px' }}>
+                Coordinates: {Number(station.latitude).toFixed(4)}°N, {Number(station.longitude).toFixed(4)}°E
+              </p>
+            )}
             <p style={{ fontSize: 11, color: '#78716C', margin: 0 }}>
               Period: {fmtDT(fromISO)} — {fmtDT(toISO)}
             </p>
@@ -444,7 +436,7 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt }) {
             <p style={{ fontSize: 11, fontWeight: 600, color: '#1C1917', margin: 0, fontFamily: 'DM Mono, monospace' }}>
               {fmtDT(generatedAt)}
             </p>
-            <p style={{ fontSize: 10, color: '#78716C', margin: '4px 0 0' }}>AirWatch Monitoring Platform</p>
+            <p style={{ fontSize: 10, color: '#78716C', margin: '4px 0 0' }}>Hills and Field AirWatch Monitoring Dashboard</p>
           </div>
         </div>
       </div>
@@ -480,16 +472,15 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt }) {
                 {COLS.map(c => (
                   <th key={c.key} style={{ ...thStyle, textAlign: 'right', minWidth: 68 }}>
                     {c.label}<br />
-                    <span style={{ fontSize: 8, fontWeight: 400, opacity: 0.85 }}>{c.unit}</span>
+                    <span style={{ fontSize: 9, fontWeight: 400, opacity: 0.85 }}>{c.unit}</span>
                   </th>
                 ))}
-                <th style={{ ...thStyle, textAlign: 'right', minWidth: 36 }}>N</th>
               </tr>
             </thead>
             <tbody>
               {tableRows.length === 0 ? (
                 <tr>
-                  <td colSpan={COLS.length + 2} style={{ ...tdStyle(0), textAlign: 'center', padding: '28px', color: '#A8A29E' }}>
+                  <td colSpan={COLS.length + 1} style={{ ...tdStyle(0), textAlign: 'center', padding: '28px', color: '#A8A29E' }}>
                     No data for this period
                   </td>
                 </tr>
@@ -503,7 +494,6 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt }) {
                       {fmt(r[c.key], c.dp)}
                     </td>
                   ))}
-                  <td style={{ ...tdStyle(i), textAlign: 'right', color: '#A8A29E', fontSize: 9 }}>{r.n}</td>
                 </tr>
               ))}
             </tbody>
@@ -511,11 +501,11 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt }) {
         </div>
       </div>
 
-      {/* ── 4. Descriptive Statistics ── */}
+      {/* ── 4. Statistical Analysis ── */}
       <div className="pb" style={{ marginBottom: 24 }}>
         <h3 style={{ fontSize: 12, fontWeight: 700, margin: '0 0 10px', color: '#1C1917', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ width: 4, height: 13, background: TEAL, borderRadius: 2, display: 'inline-block' }} />
-          Descriptive Statistics
+          Statistical Analysis
           <span style={{ fontSize: 10, fontWeight: 400, color: '#78716C' }}>(based on all raw readings)</span>
         </h3>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -531,14 +521,14 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt }) {
               const s = calcStats(readings, c.key);
               return (
                 <tr key={c.key} style={{ background: i % 2 === 0 ? '#ffffff' : '#f9fafb' }}>
-                  <td style={{ padding: '7px 9px', fontSize: 11, fontWeight: 700, color: '#1C1917', fontFamily: 'Instrument Sans, sans-serif', borderBottom: '1px solid #f0f0f0' }}>{c.label}</td>
-                  <td style={{ padding: '7px 9px', fontSize: 10, color: '#57534E', fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0' }}>{c.unit}</td>
-                  <td style={{ padding: '7px 9px', fontSize: 10, fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0', color: '#1C1917' }}>{s.n || '—'}</td>
-                  <td style={{ padding: '7px 9px', fontSize: 10, fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0', color: '#1C1917' }}>{fmt(s.mean, c.dp)}</td>
-                  <td style={{ padding: '7px 9px', fontSize: 10, fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0', color: '#1C1917' }}>{fmt(s.min, c.dp)}</td>
-                  <td style={{ padding: '7px 9px', fontSize: 10, fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0', color: '#1C1917' }}>{fmt(s.max, c.dp)}</td>
-                  <td style={{ padding: '7px 9px', fontSize: 10, fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0', color: '#1C1917' }}>{fmt(s.sd, c.dp)}</td>
-                  <td style={{ padding: '7px 9px', fontSize: 10, fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0', color: '#1C1917' }}>{fmt(s.p98, c.dp)}</td>
+                  <td style={{ padding: '7px 9px', fontSize: 12, fontWeight: 700, color: '#1C1917', fontFamily: 'Instrument Sans, sans-serif', borderBottom: '1px solid #f0f0f0' }}>{c.label}</td>
+                  <td style={{ padding: '7px 9px', fontSize: 12, color: '#57534E', fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0' }}>{c.unit}</td>
+                  <td style={{ padding: '7px 9px', fontSize: 12, fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0', color: '#1C1917' }}>{s.n || '—'}</td>
+                  <td style={{ padding: '7px 9px', fontSize: 12, fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0', color: '#1C1917' }}>{fmt(s.mean, c.dp)}</td>
+                  <td style={{ padding: '7px 9px', fontSize: 12, fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0', color: '#1C1917' }}>{fmt(s.min, c.dp)}</td>
+                  <td style={{ padding: '7px 9px', fontSize: 12, fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0', color: '#1C1917' }}>{fmt(s.max, c.dp)}</td>
+                  <td style={{ padding: '7px 9px', fontSize: 12, fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0', color: '#1C1917' }}>{fmt(s.sd, c.dp)}</td>
+                  <td style={{ padding: '7px 9px', fontSize: 12, fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0', color: '#1C1917' }}>{fmt(s.p98, c.dp)}</td>
                 </tr>
               );
             })}
@@ -551,7 +541,7 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt }) {
         <div>
           <p style={{ fontSize: 11, fontWeight: 700, color: '#1C1917', margin: '0 0 2px' }}>Hills and Field Company Limited</p>
           <p style={{ fontSize: 10, color: '#78716C', margin: 0 }}>
-            Report generated: {fmtDT(generatedAt)} · Data source: AirWatch Monitoring Platform
+            Report generated: {fmtDT(generatedAt)} · Hills and Field AirWatch Monitoring Dashboard
           </p>
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 20 }}>
@@ -572,14 +562,15 @@ export default function Reports({ profile }) {
   const now     = new Date();
   const dayAgo  = new Date(now - 86400000);
 
-  const [stations,      setStations]      = useState([]);
-  const [stationId,     setStationId]     = useState('');
-  const [fromDT,        setFromDT]        = useState(toLocalInput(dayAgo));
-  const [toDT,          setToDT]          = useState(toLocalInput(now));
-  const [loading,       setLoading]       = useState(false);
-  const [error,         setError]         = useState('');
-  const [report,        setReport]        = useState(null);
-  const [recentReports, setRecentReports] = useState([]);
+  const [stations,       setStations]      = useState([]);
+  const [stationId,      setStationId]     = useState('');
+  const [fromDT,         setFromDT]        = useState(toLocalInput(dayAgo));
+  const [toDT,           setToDT]          = useState(toLocalInput(now));
+  const [selectedPreset, setSelectedPreset] = useState(24);
+  const [loading,        setLoading]       = useState(false);
+  const [error,          setError]         = useState('');
+  const [report,         setReport]        = useState(null);
+  const [recentReports,  setRecentReports] = useState([]);
 
   useEffect(() => {
     getStations().then(st => {
@@ -603,24 +594,29 @@ export default function Reports({ profile }) {
   }, []);
 
   function applyPreset(hours) {
-    const t = new Date();
-    const f = new Date(t - hours * 3600000);
-    setToDT(toLocalInput(t));
-    setFromDT(toLocalInput(f));
+    const t    = new Date();
+    const f    = new Date(t - hours * 3600000);
+    const tStr = toLocalInput(t);
+    const fStr = toLocalInput(f);
+    setToDT(tStr);
+    setFromDT(fStr);
+    setSelectedPreset(hours);
+    // Auto-trigger preview with the computed values directly (bypasses stale state)
+    triggerPreview(fStr, tStr);
   }
 
-  async function loadData() {
+  async function loadData(fromDTVal, toDTVal) {
     if (!stationId) { setError('Please select a station.'); return null; }
-    const fromISO = new Date(fromDT).toISOString();
-    const toISO   = new Date(toDT).toISOString();
-    if (new Date(toDT) <= new Date(fromDT)) { setError('"To" must be after "From".'); return null; }
+    const fromISO = new Date(fromDTVal).toISOString();
+    const toISO   = new Date(toDTVal).toISOString();
+    if (new Date(toDTVal) <= new Date(fromDTVal)) { setError('"To" must be after "From".'); return null; }
     setError('');
     setLoading(true);
     let readings;
     try {
       const isDemo = stationId.startsWith('demo-');
       if (isDemo) {
-        const hours = Math.max(1, Math.ceil((new Date(toDT) - new Date(fromDT)) / 3600000));
+        const hours = Math.max(1, Math.ceil((new Date(toDTVal) - new Date(fromDTVal)) / 3600000));
         readings = generateDemoHistory(Math.min(hours, 720));
       } else {
         readings = await getReadingsByDateRange(stationId, fromISO, toISO);
@@ -635,20 +631,24 @@ export default function Reports({ profile }) {
     return readings;
   }
 
-  async function handlePreview() {
-    const readings = await loadData();
+  async function triggerPreview(fromDTVal, toDTVal) {
+    const readings = await loadData(fromDTVal, toDTVal);
     if (!readings) return;
     const station = stations.find(s => s.id === stationId) || { name: 'Unknown' };
     const r = {
       station,
-      fromISO:     new Date(fromDT).toISOString(),
-      toISO:       new Date(toDT).toISOString(),
+      fromISO:     new Date(fromDTVal).toISOString(),
+      toISO:       new Date(toDTVal).toISOString(),
       readings,
       generatedAt: new Date().toISOString(),
     };
     setReport(r);
     saveHistory(station, readings.length);
     setTimeout(() => document.getElementById('aw-report')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+  }
+
+  async function handlePreview() {
+    await triggerPreview(fromDT, toDT);
   }
 
   function saveHistory(station, count) {
@@ -659,49 +659,40 @@ export default function Reports({ profile }) {
   }
 
   async function handleCSV() {
-    const readings = report?.readings || await loadData();
+    const readings = report?.readings || await loadData(fromDT, toDT);
+    if (!readings) return;
+    const station  = stations.find(s => s.id === stationId) || { name: 'Unknown' };
+    const isDaily  = (new Date(toDT) - new Date(fromDT)) / 3600000 > 7 * 24;
+    const rows     = isDaily ? buildDailyRows(readings) : buildHourlyRows(readings);
+    exportCSV(rows, station.name, fromDT.slice(0, 10), toDT.slice(0, 10), isDaily);
+  }
+
+  async function handleExcel() {
+    const readings = report?.readings || await loadData(fromDT, toDT);
+    if (!readings) return;
+    const station = stations.find(s => s.id === stationId) || { name: 'Unknown' };
+    const isDaily = (new Date(toDT) - new Date(fromDT)) / 3600000 > 7 * 24;
+    const rows    = isDaily ? buildDailyRows(readings) : buildHourlyRows(readings);
+    exportExcel(rows, station.name, fromDT.slice(0, 10), toDT.slice(0, 10), isDaily);
+  }
+
+  async function handlePDF() {
+    const readings = report?.readings || await loadData(fromDT, toDT);
     if (!readings) return;
     const station  = stations.find(s => s.id === stationId) || { name: 'Unknown' };
     const fromISO  = new Date(fromDT).toISOString();
     const toISO    = new Date(toDT).toISOString();
     const isDaily  = (new Date(toDT) - new Date(fromDT)) / 3600000 > 7 * 24;
     const rows     = isDaily ? buildDailyRows(readings) : buildHourlyRows(readings);
-    const fStr     = fromDT.slice(0, 10);
-    const tStr     = toDT.slice(0, 10);
-    exportCSV(rows, station.name, fStr, tStr, isDaily);
-  }
-
-  async function handleExcel() {
-    const readings = report?.readings || await loadData();
-    if (!readings) return;
-    const station = stations.find(s => s.id === stationId) || { name: 'Unknown' };
-    const fromISO = new Date(fromDT).toISOString();
-    const toISO   = new Date(toDT).toISOString();
-    const isDaily = (new Date(toDT) - new Date(fromDT)) / 3600000 > 7 * 24;
-    const rows    = isDaily ? buildDailyRows(readings) : buildHourlyRows(readings);
-    const fStr    = fromDT.slice(0, 10);
-    const tStr    = toDT.slice(0, 10);
-    exportExcel(rows, station.name, fStr, tStr, isDaily);
-  }
-
-  async function handlePDF() {
-    const readings = report?.readings || await loadData();
-    if (!readings) return;
-    const station = stations.find(s => s.id === stationId) || { name: 'Unknown' };
-    const fromISO = new Date(fromDT).toISOString();
-    const toISO   = new Date(toDT).toISOString();
-    const isDaily = (new Date(toDT) - new Date(fromDT)) / 3600000 > 7 * 24;
-    const rows    = isDaily ? buildDailyRows(readings) : buildHourlyRows(readings);
-    const genAt   = report?.generatedAt || new Date().toISOString();
+    const genAt    = report?.generatedAt || new Date().toISOString();
     try {
-      exportPDF(rows, readings, station.name, fromISO, toISO, genAt, isDaily);
+      exportPDF(rows, readings, station, fromISO, toISO, genAt, isDaily);
     } catch (err) {
       console.error('PDF generation failed:', err);
       setError('PDF generation failed: ' + (err?.message || String(err)));
     }
   }
 
-  // Style helpers
   const inputSt = {
     width: '100%', padding: '8px 11px', borderRadius: 9,
     border: '1px solid rgba(255,255,255,0.5)',
@@ -742,17 +733,24 @@ export default function Reports({ profile }) {
         {/* Presets */}
         <div style={{ display: 'flex', gap: 7, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
           <span style={{ fontSize: 10, fontWeight: 700, color: '#A8A29E', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Presets:</span>
-          {PRESETS.map(p => (
-            <button key={p.hours} onClick={() => applyPreset(p.hours)} style={{
-              padding: '4px 12px', borderRadius: 7, border: '1px solid rgba(255,255,255,0.55)',
-              background: 'rgba(255,255,255,0.38)', fontSize: 11, fontWeight: 600,
-              cursor: 'pointer', color: '#44403C', fontFamily: 'var(--font)',
-              transition: 'background 0.15s',
-            }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.6)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.38)'}
-            >{p.label}</button>
-          ))}
+          {PRESETS.map(p => {
+            const isActive = selectedPreset === p.hours;
+            return (
+              <button key={p.hours} onClick={() => applyPreset(p.hours)} style={{
+                padding: '4px 12px', borderRadius: 7,
+                border: isActive ? `1px solid ${TEAL}` : '1px solid rgba(255,255,255,0.55)',
+                background: isActive ? TEAL : 'rgba(255,255,255,0.38)',
+                fontSize: 11, fontWeight: 600,
+                cursor: 'pointer',
+                color: isActive ? '#fff' : '#44403C',
+                fontFamily: 'var(--font)',
+                transition: 'all 0.15s',
+              }}
+                onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.6)'; }}
+                onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.38)'; }}
+              >{p.label}</button>
+            );
+          })}
         </div>
 
         {/* Station + date-time inputs */}
@@ -765,11 +763,15 @@ export default function Reports({ profile }) {
           </div>
           <div>
             <label style={labelSt}>From (date &amp; time)</label>
-            <input type="datetime-local" value={fromDT} max={toDT} onChange={e => setFromDT(e.target.value)} style={inputSt} />
+            <input type="datetime-local" value={fromDT} max={toDT}
+              onChange={e => { setFromDT(e.target.value); setSelectedPreset(null); }}
+              style={inputSt} />
           </div>
           <div>
             <label style={labelSt}>To (date &amp; time)</label>
-            <input type="datetime-local" value={toDT} min={fromDT} onChange={e => setToDT(e.target.value)} style={inputSt} />
+            <input type="datetime-local" value={toDT} min={fromDT}
+              onChange={e => { setToDT(e.target.value); setSelectedPreset(null); }}
+              style={inputSt} />
           </div>
         </div>
 
@@ -829,6 +831,7 @@ export default function Reports({ profile }) {
                     setStationId(r.stationId);
                     setFromDT(r.fromDT);
                     setToDT(r.toDT);
+                    setSelectedPreset(null);
                   }}
                   style={{ padding: '5px 12px', borderRadius: 7, border: `1px solid ${TEAL}40`, background: `${TEAL}0d`, color: TEAL, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}
                 >
