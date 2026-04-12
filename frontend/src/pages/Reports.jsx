@@ -1,26 +1,70 @@
 import { useState, useEffect, useRef } from 'react';
-import { FileText, Download, Calendar, AlertTriangle, Loader2, Clock, Trash2, Printer, ChevronDown, ChevronUp } from 'lucide-react';
+import { FileText, AlertTriangle, Loader2, Clock, Trash2, Printer, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { getStations, getReadingsByDateRange } from '../lib/supabase';
 import { glass, glassInner, POLLUTANTS, getAqiLevel, generateDemoHistory, NCEC_STANDARDS } from '../lib/utils';
 
-// ── helpers ─────────────────────────────────────────────────────────────────
+// ── helpers ──────────────────────────────────────────────────────────────────
 
 function fmtN(v, d = 1) { return v != null && !isNaN(Number(v)) ? Number(v).toFixed(d) : '—'; }
 function fmtDate(s) { return new Date(s).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); }
 function fmtDateTime(s) { return new Date(s).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }); }
+function fmtHour(isoStr) {
+  const d = new Date(isoStr);
+  return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+// US EPA PM2.5 → AQI breakpoints
+const PM25_BP = [
+  { lo: 0,     hi: 12.0,  aqiLo: 0,   aqiHi: 50  },
+  { lo: 12.1,  hi: 35.4,  aqiLo: 51,  aqiHi: 100 },
+  { lo: 35.5,  hi: 55.4,  aqiLo: 101, aqiHi: 150 },
+  { lo: 55.5,  hi: 150.4, aqiLo: 151, aqiHi: 200 },
+  { lo: 150.5, hi: 250.4, aqiLo: 201, aqiHi: 300 },
+  { lo: 250.5, hi: 350.4, aqiLo: 301, aqiHi: 400 },
+  { lo: 350.5, hi: 500.4, aqiLo: 401, aqiHi: 500 },
+];
+function pm25ToAqi(pm25) {
+  if (pm25 == null || isNaN(pm25)) return null;
+  const c = Math.round(pm25 * 10) / 10;
+  const bp = PM25_BP.find(b => c >= b.lo && c <= b.hi);
+  if (!bp) return c > 500 ? 500 : 0;
+  return Math.round(((bp.aqiHi - bp.aqiLo) / (bp.hi - bp.lo)) * (c - bp.lo) + bp.aqiLo);
+}
+
+// Group raw readings into hourly buckets and average each parameter
+const HOURLY_KEYS = ['pm25', 'pm10', 'so2', 'no2', 'o3', 'co', 'temperature', 'humidity', 'wind_speed', 'pressure'];
+function buildHourlyRows(readings) {
+  const buckets = {};
+  readings.forEach(r => {
+    const d = new Date(r.timestamp);
+    d.setMinutes(0, 0, 0);
+    const key = d.toISOString();
+    if (!buckets[key]) buckets[key] = [];
+    buckets[key].push(r);
+  });
+  return Object.entries(buckets)
+    .sort(([a], [b]) => b.localeCompare(a)) // newest first
+    .map(([hourIso, recs]) => {
+      const row = { timestamp: hourIso, count: recs.length };
+      HOURLY_KEYS.forEach(k => {
+        const vals = recs.map(r => r[k]).filter(v => v != null && !isNaN(Number(v))).map(Number);
+        row[k] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+      });
+      row.aqi = row.pm25 != null ? pm25ToAqi(row.pm25) : null;
+      return row;
+    });
+}
 
 function stdDev(vals) {
   if (vals.length < 2) return null;
   const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
   return Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length);
 }
-
 function percentile(sorted, p) {
   if (!sorted.length) return null;
   const idx = Math.ceil((p / 100) * sorted.length) - 1;
   return sorted[Math.max(0, Math.min(idx, sorted.length - 1))];
 }
-
 function calcStats(readings, key) {
   const vals = readings.map(r => r[key]).filter(v => v != null && !isNaN(Number(v))).map(Number);
   if (!vals.length) return { count: 0, mean: null, min: null, max: null, sd: null, p98: null, avg: null };
@@ -28,22 +72,6 @@ function calcStats(readings, key) {
   const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
   return { count: vals.length, mean, avg: mean, min: sorted[0], max: sorted[sorted.length - 1], sd: stdDev(vals), p98: percentile(sorted, 98) };
 }
-
-// Rolling N-hour average (returns array of { timestamp, value })
-function rollingAvg(readings, key, hours) {
-  const ms = hours * 3600000;
-  return readings.map((r, i) => {
-    const t = new Date(r.timestamp).getTime();
-    const window = readings.filter(x => {
-      const xt = new Date(x.timestamp).getTime();
-      return xt >= t - ms && xt <= t;
-    });
-    const vals = window.map(x => x[key]).filter(v => v != null && !isNaN(Number(v))).map(Number);
-    return { timestamp: r.timestamp, value: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null };
-  });
-}
-
-// Daily averages grouped by date
 function calcDailyAvgs(readings, key) {
   const groups = {};
   readings.forEach(r => {
@@ -54,51 +82,100 @@ function calcDailyAvgs(readings, key) {
   return Object.entries(groups).map(([day, vals]) => ({
     date: day,
     avg: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null,
-    count: vals.length,
   }));
 }
 
-// Build compliance rows per NCEC_STANDARDS
+// Rolling N-hour average
+function rollingAvg(readings, key, hours) {
+  const ms = hours * 3600000;
+  return readings.map(r => {
+    const t = new Date(r.timestamp).getTime();
+    const vals = readings
+      .filter(x => { const xt = new Date(x.timestamp).getTime(); return xt >= t - ms && xt <= t; })
+      .map(x => x[key]).filter(v => v != null && !isNaN(Number(v))).map(Number);
+    return { timestamp: r.timestamp, value: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null };
+  });
+}
+
 function buildComplianceRows(readings) {
-  return Object.entries(NCEC_STANDARDS).map(([key, meta]) => {
-    const rows = meta.standards.map(std => {
-      let values, exceedCount;
-      if (std.period === '1-hour') {
-        const hourly = rollingAvg(readings, key, 1);
-        values = hourly.map(h => h.value).filter(v => v != null);
-        exceedCount = values.filter(v => v > std.limit).length;
-      } else if (std.period === '8-hour') {
-        const rolling = rollingAvg(readings, key, 8);
-        values = rolling.map(h => h.value).filter(v => v != null);
-        exceedCount = values.filter(v => v > std.limit).length;
-      } else if (std.period === '24-hour') {
-        const daily = calcDailyAvgs(readings, key);
-        values = daily.map(d => d.avg).filter(v => v != null);
-        exceedCount = values.filter(v => v > std.limit).length;
-      } else if (std.period === '1-year') {
+  return Object.entries(NCEC_STANDARDS).flatMap(([key, meta]) =>
+    meta.standards.map(std => {
+      let values;
+      if (std.period === '1-hour')       values = rollingAvg(readings, key, 1).map(h => h.value).filter(v => v != null);
+      else if (std.period === '8-hour')  values = rollingAvg(readings, key, 8).map(h => h.value).filter(v => v != null);
+      else if (std.period === '24-hour') values = calcDailyAvgs(readings, key).map(d => d.avg).filter(v => v != null);
+      else {
         const allVals = readings.map(r => r[key]).filter(v => v != null && !isNaN(Number(v))).map(Number);
         values = allVals.length ? [allVals.reduce((a, b) => a + b, 0) / allVals.length] : [];
-        exceedCount = values.filter(v => v > std.limit).length;
-      } else {
-        values = [];
-        exceedCount = 0;
       }
+      const exceedCount = values.filter(v => v > std.limit).length;
       const avg = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
       const max = values.length ? Math.max(...values) : null;
-      const compliant = exceedCount === 0;
-      return { ...std, key, label: meta.label, unit: meta.unit, color: meta.color, avg, max, exceedCount, compliant, dataPoints: values.length };
-    });
-    return rows;
-  }).flat();
+      return { ...std, key, label: meta.label, unit: meta.unit, color: meta.color, avg, max, exceedCount, compliant: exceedCount === 0, dataPoints: values.length };
+    })
+  );
 }
 
 const DATE_PRESETS = [
-  { label: 'Last 24h',  days: 1 },
+  { label: 'Last 24h', days: 1 },
   { label: 'Last 7 Days', days: 7 },
   { label: 'Last 30 Days', days: 30 },
 ];
 
-// ── ReportView ───────────────────────────────────────────────────────────────
+// ── Shared table styles for the REPORT (clean white, no glass) ───────────────
+
+const RS = {
+  section: {
+    background: '#ffffff',
+    border: '1px solid #E7E5E4',
+    borderRadius: 10,
+    padding: '20px 24px',
+    marginBottom: 16,
+  },
+  th: {
+    padding: '9px 12px',
+    background: '#16A34A',
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+    textAlign: 'left',
+    fontFamily: 'Instrument Sans, sans-serif',
+    borderBottom: 'none',
+  },
+  thDark: {
+    padding: '9px 12px',
+    background: '#1C1917',
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+    textAlign: 'left',
+    fontFamily: 'Instrument Sans, sans-serif',
+  },
+  td: {
+    padding: '8px 12px',
+    borderBottom: '1px solid #E7E5E4',
+    fontSize: 12,
+    fontFamily: 'DM Mono, monospace',
+    color: '#1C1917',
+    verticalAlign: 'middle',
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: 700,
+    margin: '0 0 14px',
+    color: '#1C1917',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    fontFamily: 'Instrument Sans, sans-serif',
+  },
+};
+
+// ── ReportView ────────────────────────────────────────────────────────────────
 
 function ReportView({ station, from, to, readings, generatedAt }) {
   const printStyleRef = useRef(null);
@@ -108,12 +185,34 @@ function ReportView({ station, from, to, readings, generatedAt }) {
     style.id = 'airwatch-print-css';
     style.textContent = `
       @media print {
-        aside, .report-generator, nav { display: none !important; }
-        body { background: #fff !important; }
-        main { margin-left: 0 !important; padding: 0 !important; }
-        .no-print { display: none !important; }
-        .print-section { break-inside: avoid; }
-        @page { margin: 18mm 16mm; size: A4; }
+        aside, .report-generator, nav, .no-print { display: none !important; }
+        html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
+        main { margin-left: 0 !important; padding: 6mm 8mm !important; max-width: 100% !important; }
+        #airwatch-report { max-width: 100% !important; }
+        #airwatch-report * {
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
+          box-shadow: none !important;
+        }
+        .report-section {
+          background: #fff !important;
+          border: 1px solid #E7E5E4 !important;
+          border-radius: 6px !important;
+          break-inside: avoid;
+          page-break-inside: avoid;
+          margin-bottom: 10mm !important;
+        }
+        .report-page-break { page-break-before: always; break-before: page; }
+        .report-summary-cards { display: grid !important; grid-template-columns: repeat(5,1fr) !important; gap: 6px !important; }
+        .report-card {
+          background: #fff !important;
+          border: 1px solid #E7E5E4 !important;
+          border-radius: 6px !important;
+          padding: 10px 12px !important;
+        }
+        table { width: 100% !important; font-size: 10px !important; }
+        th, td { padding: 6px 8px !important; }
+        @page { margin: 14mm 12mm; size: A4 portrait; }
       }
     `;
     document.head.appendChild(style);
@@ -122,133 +221,119 @@ function ReportView({ station, from, to, readings, generatedAt }) {
   }, []);
 
   const complianceRows = buildComplianceRows(readings);
-  const aqiStats = calcStats(readings, 'aqi');
-  const aqiLvl = getAqiLevel(Math.round(aqiStats.avg || 0));
-  const overallCompliant = complianceRows.every(r => r.compliant || r.dataPoints === 0);
-  const totalExceedances = complianceRows.reduce((s, r) => s + r.exceedCount, 0);
+  const hourlyRows     = buildHourlyRows(readings);
+  // Compute AQI from PM2.5 for each raw reading, then stats
+  const aqiValues = readings.map(r => pm25ToAqi(r.pm25)).filter(v => v != null);
+  const aqiAvg    = aqiValues.length ? Math.round(aqiValues.reduce((a, b) => a + b, 0) / aqiValues.length) : null;
+  const aqiMin    = aqiValues.length ? Math.min(...aqiValues) : null;
+  const aqiMax    = aqiValues.length ? Math.max(...aqiValues) : null;
+  const aqiLvl    = getAqiLevel(aqiAvg || 0);
+
+  const overallCompliant  = complianceRows.every(r => r.compliant || r.dataPoints === 0);
+  const totalExceedances  = complianceRows.reduce((s, r) => s + r.exceedCount, 0);
+
+  // Data capture % (expected 1 reading/hour)
+  const expectedHours   = Math.max(1, Math.round((new Date(to + 'T23:59:59') - new Date(from + 'T00:00:00')) / 3600000));
+  const capturePercent  = Math.min(100, Math.round((hourlyRows.length / expectedHours) * 100));
 
   const MET_PARAMS = [
-    { key: 'temperature', label: 'Temperature', unit: '°C' },
-    { key: 'humidity', label: 'Relative Humidity', unit: '%' },
-    { key: 'wind_speed', label: 'Wind Speed', unit: 'm/s' },
-    { key: 'pressure', label: 'Pressure', unit: 'hPa' },
+    { key: 'temperature', label: 'Temperature',      unit: '°C' },
+    { key: 'humidity',    label: 'Relative Humidity', unit: '%' },
+    { key: 'wind_speed',  label: 'Wind Speed',        unit: 'm/s' },
+    { key: 'pressure',    label: 'Pressure',          unit: 'hPa' },
   ];
 
-  const cellStyle = (border = true) => ({
-    padding: '8px 12px',
-    borderBottom: border ? '1px solid #E7E5E4' : 'none',
-    fontSize: 12,
-    fontFamily: 'DM Mono, monospace',
-    color: '#1C1917',
-    verticalAlign: 'middle',
-  });
-
-  const thStyle = {
-    padding: '9px 12px',
-    background: '#16A34A',
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 700,
-    letterSpacing: '0.06em',
-    textTransform: 'uppercase',
-    textAlign: 'left',
-    fontFamily: 'Instrument Sans, sans-serif',
-  };
-
   return (
-    <div id="airwatch-report" style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#1C1917', maxWidth: 900, margin: '0 auto' }}>
+    <div id="airwatch-report" style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#1C1917', maxWidth: 920, margin: '0 auto' }}>
 
-      {/* ── Header ── */}
-      <div className="print-section" style={{ ...glass({ padding: '24px 28px', marginBottom: 16, borderRadius: 16 }), display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      {/* ── a. Header ── */}
+      <div className="report-section" style={{ ...RS.section, borderLeft: '4px solid #16A34A', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: '#16A34A', textTransform: 'uppercase', marginBottom: 6 }}>Hills and Field Company Limited · NCEC Type A Environmental Consultancy</p>
-          <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.02em' }}>Air Quality Compliance Report</h2>
-          <p style={{ fontSize: 13, color: '#57534E', margin: 0 }}>{station.name} &nbsp;·&nbsp; {fmtDate(from)} – {fmtDate(to)}</p>
+          <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: '#16A34A', textTransform: 'uppercase', margin: '0 0 6px' }}>Hills and Field Company Limited</p>
+          <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.02em', color: '#1C1917' }}>Air Quality Compliance Report</h2>
+          <p style={{ fontSize: 13, color: '#57534E', margin: '0 0 4px' }}>{station.name}</p>
+          <p style={{ fontSize: 12, color: '#78716C', margin: 0 }}>Period: {fmtDate(from)} – {fmtDate(to)} &nbsp;·&nbsp; Generated: {fmtDateTime(generatedAt)}</p>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ ...glassInner({ padding: '10px 16px', display: 'inline-block' }), background: overallCompliant ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.10)', border: `1px solid ${overallCompliant ? 'rgba(22,163,74,0.3)' : 'rgba(220,38,38,0.3)'}` }}>
-            <p style={{ fontSize: 10, color: '#78716C', margin: '0 0 2px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Overall Status</p>
-            <p style={{ fontSize: 16, fontWeight: 700, margin: 0, color: overallCompliant ? '#16A34A' : '#DC2626' }}>
+        <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 24 }}>
+          <div style={{ display: 'inline-block', padding: '10px 18px', background: overallCompliant ? '#F0FDF4' : '#FEF2F2', border: `1px solid ${overallCompliant ? '#86EFAC' : '#FCA5A5'}`, borderRadius: 10 }}>
+            <p style={{ fontSize: 10, color: '#78716C', margin: '0 0 3px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Overall Status</p>
+            <p style={{ fontSize: 17, fontWeight: 700, margin: '0 0 2px', color: overallCompliant ? '#16A34A' : '#DC2626' }}>
               {overallCompliant ? '✓ Compliant' : `✗ ${totalExceedances} Exceedance${totalExceedances !== 1 ? 's' : ''}`}
             </p>
-            <p style={{ fontSize: 10, color: '#A8A29E', margin: '2px 0 0' }}>Per NCEC Executive Regulation (Royal Decree M/165)</p>
+            <p style={{ fontSize: 10, color: '#78716C', margin: 0 }}>Royal Decree M/165</p>
           </div>
         </div>
       </div>
 
-      {/* ── Summary Cards ── */}
-      <div className="print-section" style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 16 }}>
+      {/* ── b. Summary Cards ── */}
+      <div className="report-summary-cards" style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10, marginBottom: 16 }}>
         {[
-          { label: 'Avg AQI', value: fmtN(aqiStats.avg, 0), sub: aqiLvl.label, color: aqiLvl.color },
-          { label: 'Min AQI', value: fmtN(aqiStats.min, 0), sub: 'Best reading', color: '#16A34A' },
-          { label: 'Max AQI', value: fmtN(aqiStats.max, 0), sub: 'Worst reading', color: '#DC2626' },
-          { label: 'Data Points', value: readings.length, sub: `${Math.round(readings.length / Math.max(1, (new Date(to) - new Date(from)) / 86400000))}/day avg`, color: '#3B82F6' },
-          { label: 'Exceedances', value: totalExceedances, sub: totalExceedances === 0 ? 'All standards met' : 'NCEC threshold(s)', color: totalExceedances === 0 ? '#16A34A' : '#DC2626' },
+          { label: 'Data Points',   value: readings.length,                   sub: `${hourlyRows.length} hours`,              color: '#3B82F6' },
+          { label: 'Data Capture',  value: `${capturePercent}%`,              sub: `${hourlyRows.length} / ${expectedHours}h`, color: capturePercent >= 75 ? '#16A34A' : '#CA8A04' },
+          { label: 'Average AQI',   value: aqiAvg ?? '—',                     sub: aqiLvl.label,                              color: aqiLvl.color },
+          { label: 'Min AQI',       value: aqiMin ?? '—',                     sub: 'Best hour',                               color: '#16A34A' },
+          { label: 'Max AQI',       value: aqiMax ?? '—',                     sub: 'Worst hour',                              color: '#DC2626' },
         ].map((b, i) => (
-          <div key={i} style={{ ...glass({ padding: '14px 16px', borderRadius: 14, borderTop: `3px solid ${b.color}` }) }}>
-            <p style={{ fontSize: 10, color: '#78716C', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>{b.label}</p>
+          <div key={i} className="report-card" style={{ ...RS.section, padding: '14px 16px', borderTop: `3px solid ${b.color}` }}>
+            <p style={{ fontSize: 10, color: '#78716C', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 5px' }}>{b.label}</p>
             <p style={{ fontSize: 24, fontWeight: 700, fontFamily: 'DM Mono, monospace', color: '#1C1917', margin: '0 0 2px', lineHeight: 1 }}>{b.value}</p>
             <p style={{ fontSize: 11, color: b.color, fontWeight: 600, margin: 0 }}>{b.sub}</p>
           </div>
         ))}
       </div>
 
-      {/* ── NCEC Compliance Table ── */}
-      <div className="print-section" style={{ ...glass({ padding: '20px 24px', marginBottom: 16, borderRadius: 16 }) }}>
-        <h3 style={{ fontSize: 13, fontWeight: 700, margin: '0 0 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ width: 4, height: 14, background: '#16A34A', borderRadius: 2, display: 'inline-block' }} />
+      {/* ── c. NCEC Compliance Table ── */}
+      <div className="report-section report-page-break" style={RS.section}>
+        <h3 style={RS.sectionTitle}>
+          <span style={{ width: 4, height: 14, background: '#16A34A', borderRadius: 2, flexShrink: 0 }} />
           NCEC Compliance — Royal Decree M/165 (Appendix 1)
         </h3>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              {['Pollutant', 'Unit', 'Avg. Period', 'NCEC Limit', 'Measured Avg', 'Measured Max', 'Exceedances', 'Allowed', 'Status'].map(h => (
-                <th key={h} style={thStyle}>{h}</th>
+              {['Pollutant','Unit','Avg. Period','NCEC Limit','Measured Avg','Measured Max','Exceedances','Allowed','Status'].map(h => (
+                <th key={h} style={RS.th}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {complianceRows.map((row, i) => {
-              const bg = row.dataPoints === 0 ? '#fff' : row.compliant ? '#F0FDF4' : '#FEF2F2';
-              return (
-                <tr key={i} style={{ background: bg }}>
-                  <td style={{ ...cellStyle(), fontWeight: 700, fontFamily: 'Instrument Sans, sans-serif', color: row.color }}>{row.label}</td>
-                  <td style={cellStyle()}>{row.unit}</td>
-                  <td style={cellStyle()}>{row.period}</td>
-                  <td style={{ ...cellStyle(), fontWeight: 700 }}>{row.limit.toLocaleString()}</td>
-                  <td style={cellStyle()}>{fmtN(row.avg)}</td>
-                  <td style={cellStyle()}>{fmtN(row.max)}</td>
-                  <td style={{ ...cellStyle(), fontWeight: 700, color: row.exceedCount > 0 ? '#DC2626' : '#16A34A' }}>{row.dataPoints === 0 ? '—' : row.exceedCount}</td>
-                  <td style={{ ...cellStyle(), color: '#78716C', fontSize: 10 }}>{row.exceedances || '—'}</td>
-                  <td style={cellStyle()}>
-                    {row.dataPoints === 0
-                      ? <span style={{ color: '#A8A29E', fontSize: 11 }}>No data</span>
-                      : row.compliant
-                        ? <span style={{ color: '#16A34A', fontWeight: 700, fontSize: 11 }}>✓ Compliant</span>
-                        : <span style={{ color: '#DC2626', fontWeight: 700, fontSize: 11 }}>✗ Exceeded</span>
-                    }
-                  </td>
-                </tr>
-              );
-            })}
+            {complianceRows.map((row, i) => (
+              <tr key={i} style={{ background: row.dataPoints === 0 ? '#fff' : row.compliant ? '#F0FDF4' : '#FEF2F2' }}>
+                <td style={{ ...RS.td, fontWeight: 700, fontFamily: 'Instrument Sans, sans-serif', color: row.color }}>{row.label}</td>
+                <td style={RS.td}>{row.unit}</td>
+                <td style={RS.td}>{row.period}</td>
+                <td style={{ ...RS.td, fontWeight: 700 }}>{row.limit.toLocaleString()}</td>
+                <td style={RS.td}>{fmtN(row.avg)}</td>
+                <td style={RS.td}>{fmtN(row.max)}</td>
+                <td style={{ ...RS.td, fontWeight: 700, color: row.exceedCount > 0 ? '#DC2626' : '#16A34A' }}>{row.dataPoints === 0 ? '—' : row.exceedCount}</td>
+                <td style={{ ...RS.td, fontSize: 10, color: '#78716C' }}>{row.exceedances || '—'}</td>
+                <td style={RS.td}>
+                  {row.dataPoints === 0
+                    ? <span style={{ color: '#A8A29E', fontSize: 11 }}>No data</span>
+                    : row.compliant
+                      ? <span style={{ color: '#16A34A', fontWeight: 700, fontSize: 11 }}>✓ Compliant</span>
+                      : <span style={{ color: '#DC2626', fontWeight: 700, fontSize: 11 }}>✗ Exceeded</span>}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
-        <p style={{ fontSize: 10, color: '#78716C', marginTop: 8, lineHeight: 1.5 }}>
-          NCEC Executive Regulation on Air Quality Standards (Royal Decree M/165, Appendix 1, 2019). Averaging periods applied as specified per pollutant. Exceedances counted against measured data in selected date range only.
+        <p style={{ fontSize: 10, color: '#78716C', marginTop: 10, lineHeight: 1.6 }}>
+          Standards per NCEC Executive Regulation on Air Quality (Royal Decree M/165, Appendix 1, 2019). Averaging periods applied as specified. Exceedances counted against data in selected range only.
         </p>
       </div>
 
-      {/* ── Statistics Table ── */}
-      <div className="print-section" style={{ ...glass({ padding: '20px 24px', marginBottom: 16, borderRadius: 16 }) }}>
-        <h3 style={{ fontSize: 13, fontWeight: 700, margin: '0 0 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ width: 4, height: 14, background: '#3B82F6', borderRadius: 2, display: 'inline-block' }} />
+      {/* ── d. Descriptive Statistics ── */}
+      <div className="report-section report-page-break" style={RS.section}>
+        <h3 style={RS.sectionTitle}>
+          <span style={{ width: 4, height: 14, background: '#3B82F6', borderRadius: 2, flexShrink: 0 }} />
           Descriptive Statistics
         </h3>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              {['Pollutant', 'Unit', 'Count', 'Mean', 'Min', 'Max', 'Std Dev', 'P98', 'Exceedances (24h avg)'].map(h => (
-                <th key={h} style={thStyle}>{h}</th>
+              {['Pollutant','Unit','N','Mean','Min','Max','Std Dev','P98','Daily Exceedances'].map(h => (
+                <th key={h} style={RS.th}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -258,17 +343,17 @@ function ReportView({ station, from, to, readings, generatedAt }) {
               const daily = calcDailyAvgs(readings, p.key);
               const dailyExceed = daily.filter(d => d.avg != null && d.avg > p.threshold).length;
               return (
-                <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : 'rgba(248,248,247,0.8)' }}>
-                  <td style={{ ...cellStyle(), fontWeight: 700, fontFamily: 'Instrument Sans, sans-serif', color: p.color }}>{p.name}</td>
-                  <td style={cellStyle()}>{p.unit}</td>
-                  <td style={cellStyle()}>{s.count || '—'}</td>
-                  <td style={cellStyle()}>{fmtN(s.mean)}</td>
-                  <td style={cellStyle()}>{fmtN(s.min)}</td>
-                  <td style={cellStyle()}>{fmtN(s.max)}</td>
-                  <td style={cellStyle()}>{fmtN(s.sd)}</td>
-                  <td style={cellStyle()}>{fmtN(s.p98)}</td>
-                  <td style={{ ...cellStyle(), color: dailyExceed > 0 ? '#DC2626' : '#16A34A', fontWeight: dailyExceed > 0 ? 700 : 400 }}>
-                    {s.count === 0 ? '—' : dailyExceed === 0 ? '0 (All OK)' : `${dailyExceed} day${dailyExceed !== 1 ? 's' : ''}`}
+                <tr key={i} style={{ background: i % 2 === 0 ? '#ffffff' : '#F9FAFB' }}>
+                  <td style={{ ...RS.td, fontWeight: 700, fontFamily: 'Instrument Sans, sans-serif', color: p.color }}>{p.name}</td>
+                  <td style={RS.td}>{p.unit}</td>
+                  <td style={RS.td}>{s.count || '—'}</td>
+                  <td style={RS.td}>{fmtN(s.mean)}</td>
+                  <td style={RS.td}>{fmtN(s.min)}</td>
+                  <td style={RS.td}>{fmtN(s.max)}</td>
+                  <td style={RS.td}>{fmtN(s.sd)}</td>
+                  <td style={RS.td}>{fmtN(s.p98)}</td>
+                  <td style={{ ...RS.td, color: dailyExceed > 0 ? '#DC2626' : '#16A34A', fontWeight: dailyExceed > 0 ? 700 : 400 }}>
+                    {s.count === 0 ? '—' : dailyExceed === 0 ? '0 (OK)' : `${dailyExceed} day${dailyExceed !== 1 ? 's' : ''}`}
                   </td>
                 </tr>
               );
@@ -277,17 +362,17 @@ function ReportView({ station, from, to, readings, generatedAt }) {
         </table>
       </div>
 
-      {/* ── Meteorological Summary ── */}
-      <div className="print-section" style={{ ...glass({ padding: '20px 24px', marginBottom: 16, borderRadius: 16 }) }}>
-        <h3 style={{ fontSize: 13, fontWeight: 700, margin: '0 0 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ width: 4, height: 14, background: '#F59E0B', borderRadius: 2, display: 'inline-block' }} />
+      {/* ── e. Meteorological Summary ── */}
+      <div className="report-section" style={RS.section}>
+        <h3 style={RS.sectionTitle}>
+          <span style={{ width: 4, height: 14, background: '#F59E0B', borderRadius: 2, flexShrink: 0 }} />
           Meteorological Summary
         </h3>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              {['Parameter', 'Unit', 'Count', 'Mean', 'Min', 'Max', 'Std Dev'].map(h => (
-                <th key={h} style={thStyle}>{h}</th>
+              {['Parameter','Unit','N','Mean','Min','Max','Std Dev'].map(h => (
+                <th key={h} style={RS.th}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -295,14 +380,14 @@ function ReportView({ station, from, to, readings, generatedAt }) {
             {MET_PARAMS.map((m, i) => {
               const s = calcStats(readings, m.key);
               return (
-                <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : 'rgba(248,248,247,0.8)' }}>
-                  <td style={{ ...cellStyle(), fontWeight: 700, fontFamily: 'Instrument Sans, sans-serif' }}>{m.label}</td>
-                  <td style={cellStyle()}>{m.unit}</td>
-                  <td style={cellStyle()}>{s.count || '—'}</td>
-                  <td style={cellStyle()}>{fmtN(s.mean)}</td>
-                  <td style={cellStyle()}>{fmtN(s.min)}</td>
-                  <td style={cellStyle()}>{fmtN(s.max)}</td>
-                  <td style={cellStyle()}>{fmtN(s.sd)}</td>
+                <tr key={i} style={{ background: i % 2 === 0 ? '#ffffff' : '#F9FAFB' }}>
+                  <td style={{ ...RS.td, fontWeight: 700, fontFamily: 'Instrument Sans, sans-serif' }}>{m.label}</td>
+                  <td style={RS.td}>{m.unit}</td>
+                  <td style={RS.td}>{s.count || '—'}</td>
+                  <td style={RS.td}>{fmtN(s.mean)}</td>
+                  <td style={RS.td}>{fmtN(s.min)}</td>
+                  <td style={RS.td}>{fmtN(s.max)}</td>
+                  <td style={RS.td}>{fmtN(s.sd)}</td>
                 </tr>
               );
             })}
@@ -310,65 +395,49 @@ function ReportView({ station, from, to, readings, generatedAt }) {
         </table>
       </div>
 
-      {/* ── Hourly Data Table ── */}
-      <HourlyTable readings={readings} />
+      {/* ── f. Hourly Averaged Data ── */}
+      <HourlyTable hourlyRows={hourlyRows} />
 
-      {/* ── Footer ── */}
-      <div className="print-section" style={{ ...glass({ padding: '16px 24px', borderRadius: 14 }), display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+      {/* ── g. Footer ── */}
+      <div className="report-section" style={{ ...RS.section, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '3px solid #16A34A' }}>
         <div>
-          <p style={{ fontSize: 12, fontWeight: 700, margin: '0 0 2px' }}>Hills and Field Company Limited</p>
-          <p style={{ fontSize: 10, color: '#78716C', margin: 0 }}>NCEC Type A Environmental Consultancy · Report generated: {fmtDateTime(generatedAt)}</p>
+          <p style={{ fontSize: 12, fontWeight: 700, margin: '0 0 3px', color: '#1C1917' }}>Hills and Field Company Limited</p>
+          <p style={{ fontSize: 10, color: '#78716C', margin: 0, lineHeight: 1.5 }}>
+            Report generated: {fmtDateTime(generatedAt)} &nbsp;·&nbsp; Data source: AirWatch Monitoring Platform<br />
+            AQI calculated using US EPA PM2.5 breakpoint formula. Standards per NCEC Royal Decree M/165 (2019).
+          </p>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <p style={{ fontSize: 10, color: '#78716C', margin: 0 }}>Data source: AirWatch Monitoring Platform</p>
-          <p style={{ fontSize: 10, color: '#78716C', margin: '2px 0 0' }}>Station: {station.name}</p>
+        <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 20 }}>
+          <p style={{ fontSize: 10, color: '#78716C', margin: 0 }}>Station: {station.name}</p>
+          <p style={{ fontSize: 10, color: '#78716C', margin: '2px 0 0' }}>Period: {fmtDate(from)} – {fmtDate(to)}</p>
         </div>
       </div>
+
     </div>
   );
 }
 
-// Hourly table as separate component to handle its own pagination
-function HourlyTable({ readings }) {
-  const [page, setPage] = useState(0);
+// ── Hourly Averaged Data Table ────────────────────────────────────────────────
+
+function HourlyTable({ hourlyRows }) {
+  const [page, setPage]           = useState(0);
   const [collapsed, setCollapsed] = useState(false);
   const PER_PAGE = 48;
-  const sorted = [...readings].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  const total = sorted.length;
+  const total      = hourlyRows.length;
   const totalPages = Math.ceil(total / PER_PAGE);
-  const slice = sorted.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
-
-  const thStyle = {
-    padding: '8px 10px',
-    background: '#1C1917',
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 700,
-    letterSpacing: '0.06em',
-    textTransform: 'uppercase',
-    textAlign: 'left',
-    fontFamily: 'Instrument Sans, sans-serif',
-    whiteSpace: 'nowrap',
-  };
-  const tdStyle = {
-    padding: '7px 10px',
-    fontSize: 11,
-    fontFamily: 'DM Mono, monospace',
-    borderBottom: '1px solid #F5F5F4',
-    whiteSpace: 'nowrap',
-  };
+  const slice      = hourlyRows.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
 
   return (
-    <div className="print-section" style={{ ...glass({ padding: '20px 24px', marginBottom: 16, borderRadius: 16 }) }}>
+    <div className="report-section report-page-break" style={{ ...RS.section, marginBottom: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: collapsed ? 0 : 14 }}>
-        <h3 style={{ fontSize: 13, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ width: 4, height: 14, background: '#8B5CF6', borderRadius: 2, display: 'inline-block' }} />
-          Hourly Data ({total} records)
+        <h3 style={{ ...RS.sectionTitle, margin: 0 }}>
+          <span style={{ width: 4, height: 14, background: '#8B5CF6', borderRadius: 2, flexShrink: 0 }} />
+          Hourly Averaged Data ({total} hours)
         </h3>
         <button
           className="no-print"
           onClick={() => setCollapsed(c => !c)}
-          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#57534E', fontFamily: 'var(--font)' }}
+          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 8, border: '1px solid #E7E5E4', background: '#F9FAFB', fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#57534E', fontFamily: 'var(--font)' }}
         >
           {collapsed ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
           {collapsed ? 'Show' : 'Hide'}
@@ -378,51 +447,60 @@ function HourlyTable({ readings }) {
       {!collapsed && (
         <>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 860 }}>
               <thead>
                 <tr>
-                  {['Timestamp', 'AQI', 'PM2.5', 'PM10', 'SO₂', 'NO₂', 'O₃', 'CO', 'Temp °C', 'Hum %', 'Wind m/s'].map(h => (
-                    <th key={h} style={thStyle}>{h}</th>
+                  {['Date / Time', 'AQI', 'PM2.5', 'PM10', 'SO₂', 'NO₂', 'O₃', 'CO', 'Temp °C', 'Hum %', 'Wind m/s', 'N'].map(h => (
+                    <th key={h} style={{ ...RS.thDark, padding: '8px 10px', fontSize: 10, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {slice.map((r, i) => (
-                  <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : 'rgba(248,248,247,0.8)' }}>
-                    <td style={{ ...tdStyle, color: '#57534E', fontWeight: 500 }}>{fmtDateTime(r.timestamp)}</td>
-                    <td style={{ ...tdStyle, fontWeight: 700, color: getAqiLevel(r.aqi || 0).color }}>{r.aqi ?? '—'}</td>
-                    <td style={tdStyle}>{r.pm25 != null ? Number(r.pm25).toFixed(1) : '—'}</td>
-                    <td style={tdStyle}>{r.pm10 != null ? Number(r.pm10).toFixed(1) : '—'}</td>
-                    <td style={tdStyle}>{r.so2 != null ? Number(r.so2).toFixed(1) : '—'}</td>
-                    <td style={tdStyle}>{r.no2 != null ? Number(r.no2).toFixed(1) : '—'}</td>
-                    <td style={tdStyle}>{r.o3 != null ? Number(r.o3).toFixed(1) : '—'}</td>
-                    <td style={tdStyle}>{r.co != null ? Number(r.co).toFixed(0) : '—'}</td>
-                    <td style={tdStyle}>{r.temperature != null ? Number(r.temperature).toFixed(1) : '—'}</td>
-                    <td style={tdStyle}>{r.humidity != null ? Number(r.humidity).toFixed(1) : '—'}</td>
-                    <td style={tdStyle}>{r.wind_speed != null ? Number(r.wind_speed).toFixed(1) : '—'}</td>
-                  </tr>
-                ))}
+                {slice.map((r, i) => {
+                  const aqi = r.aqi;
+                  const aqiLvl = aqi != null ? getAqiLevel(aqi) : null;
+                  return (
+                    <tr key={i} style={{ background: i % 2 === 0 ? '#ffffff' : '#F9FAFB' }}>
+                      <td style={{ ...RS.td, padding: '7px 10px', fontSize: 11, color: '#57534E', whiteSpace: 'nowrap' }}>{fmtHour(r.timestamp)}</td>
+                      <td style={{ ...RS.td, padding: '7px 10px', fontSize: 11, fontWeight: 700, color: aqiLvl ? aqiLvl.color : '#A8A29E' }}>{aqi ?? '—'}</td>
+                      <td style={{ ...RS.td, padding: '7px 10px', fontSize: 11 }}>{r.pm25 != null ? r.pm25.toFixed(1) : '—'}</td>
+                      <td style={{ ...RS.td, padding: '7px 10px', fontSize: 11 }}>{r.pm10 != null ? r.pm10.toFixed(1) : '—'}</td>
+                      <td style={{ ...RS.td, padding: '7px 10px', fontSize: 11 }}>{r.so2  != null ? r.so2.toFixed(1)  : '—'}</td>
+                      <td style={{ ...RS.td, padding: '7px 10px', fontSize: 11 }}>{r.no2  != null ? r.no2.toFixed(1)  : '—'}</td>
+                      <td style={{ ...RS.td, padding: '7px 10px', fontSize: 11 }}>{r.o3   != null ? r.o3.toFixed(1)   : '—'}</td>
+                      <td style={{ ...RS.td, padding: '7px 10px', fontSize: 11 }}>{r.co   != null ? r.co.toFixed(0)   : '—'}</td>
+                      <td style={{ ...RS.td, padding: '7px 10px', fontSize: 11 }}>{r.temperature != null ? r.temperature.toFixed(1) : '—'}</td>
+                      <td style={{ ...RS.td, padding: '7px 10px', fontSize: 11 }}>{r.humidity    != null ? r.humidity.toFixed(1)    : '—'}</td>
+                      <td style={{ ...RS.td, padding: '7px 10px', fontSize: 11 }}>{r.wind_speed  != null ? r.wind_speed.toFixed(1)  : '—'}</td>
+                      <td style={{ ...RS.td, padding: '7px 10px', fontSize: 11, color: '#78716C' }}>{r.count}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
+
           {totalPages > 1 && (
             <div className="no-print" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
               <p style={{ fontSize: 11, color: '#78716C', margin: 0 }}>
-                Showing {page * PER_PAGE + 1}–{Math.min((page + 1) * PER_PAGE, total)} of {total}
+                Showing hours {page * PER_PAGE + 1}–{Math.min((page + 1) * PER_PAGE, total)} of {total}
               </p>
               <div style={{ display: 'flex', gap: 6 }}>
-                <button disabled={page === 0} onClick={() => setPage(p => p - 1)} style={{ padding: '4px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.5)', background: page === 0 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.4)', fontSize: 11, cursor: page === 0 ? 'default' : 'pointer', fontFamily: 'var(--font)', color: page === 0 ? '#A8A29E' : '#1C1917' }}>
+                <button disabled={page === 0} onClick={() => setPage(p => p - 1)}
+                  style={{ padding: '4px 12px', borderRadius: 8, border: '1px solid #E7E5E4', background: page === 0 ? '#F9FAFB' : '#fff', fontSize: 11, cursor: page === 0 ? 'default' : 'pointer', fontFamily: 'var(--font)', color: page === 0 ? '#A8A29E' : '#1C1917' }}>
                   Prev
                 </button>
                 {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
                   const pg = totalPages <= 7 ? i : Math.max(0, Math.min(page - 3 + i, totalPages - 1));
                   return (
-                    <button key={pg} onClick={() => setPage(pg)} style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid', borderColor: page === pg ? '#16A34A' : 'rgba(255,255,255,0.5)', background: page === pg ? 'rgba(22,163,74,0.15)' : 'rgba(255,255,255,0.4)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)', color: page === pg ? '#16A34A' : '#1C1917', fontWeight: page === pg ? 700 : 400 }}>
+                    <button key={pg} onClick={() => setPage(pg)}
+                      style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid', borderColor: page === pg ? '#16A34A' : '#E7E5E4', background: page === pg ? '#F0FDF4' : '#fff', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)', color: page === pg ? '#16A34A' : '#1C1917', fontWeight: page === pg ? 700 : 400 }}>
                       {pg + 1}
                     </button>
                   );
                 })}
-                <button disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)} style={{ padding: '4px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.5)', background: page >= totalPages - 1 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.4)', fontSize: 11, cursor: page >= totalPages - 1 ? 'default' : 'pointer', fontFamily: 'var(--font)', color: page >= totalPages - 1 ? '#A8A29E' : '#1C1917' }}>
+                <button disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}
+                  style={{ padding: '4px 12px', borderRadius: 8, border: '1px solid #E7E5E4', background: page >= totalPages - 1 ? '#F9FAFB' : '#fff', fontSize: 11, cursor: page >= totalPages - 1 ? 'default' : 'pointer', fontFamily: 'var(--font)', color: page >= totalPages - 1 ? '#A8A29E' : '#1C1917' }}>
                   Next
                 </button>
               </div>
@@ -434,17 +512,17 @@ function HourlyTable({ readings }) {
   );
 }
 
-// ── Main Reports Page ────────────────────────────────────────────────────────
+// ── Main Reports Page ─────────────────────────────────────────────────────────
 
 export default function Reports({ profile }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today   = new Date().toISOString().slice(0, 10);
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
 
-  const [stations, setStations] = useState([]);
-  const [form, setForm] = useState({ stationId: '', from: weekAgo, to: today });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [report, setReport] = useState(null);
+  const [stations,      setStations]      = useState([]);
+  const [form,          setForm]          = useState({ stationId: '', from: weekAgo, to: today });
+  const [loading,       setLoading]       = useState(false);
+  const [error,         setError]         = useState('');
+  const [report,        setReport]        = useState(null);
   const [recentReports, setRecentReports] = useState([]);
 
   useEffect(() => {
@@ -469,22 +547,21 @@ export default function Reports({ profile }) {
   }, []);
 
   function applyPreset(days) {
-    const to = new Date().toISOString().slice(0, 10);
+    const to   = new Date().toISOString().slice(0, 10);
     const from = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
     setForm(f => ({ ...f, from, to }));
   }
 
   async function generateReport(params = form) {
     if (!params.stationId || !params.from || !params.to) { setError('Please select a station and date range.'); return; }
-    if (new Date(params.to) < new Date(params.from)) { setError('"To" date must be after "From" date.'); return; }
+    if (new Date(params.to) < new Date(params.from))     { setError('"To" date must be after "From" date.'); return; }
     setError('');
     setLoading(true);
     setReport(null);
 
     try {
       const station = stations.find(s => s.id === params.stationId) || { id: params.stationId, name: params.stationName || 'Unknown' };
-      const isDemo = params.stationId.startsWith('demo-');
-
+      const isDemo  = params.stationId.startsWith('demo-');
       let readings;
       if (isDemo) {
         const hours = Math.max(1, Math.ceil((new Date(params.to) - new Date(params.from)) / 3600000));
@@ -529,15 +606,15 @@ export default function Reports({ profile }) {
         <p style={{ color: '#78716C', fontSize: 13, margin: 0 }}>Generate NCEC compliance reports per Royal Decree M/165 for Hills and Field clients.</p>
       </div>
 
-      {/* ── Report generator form ── */}
+      {/* ── Generator form (glass) ── */}
       <div className="report-generator" style={{ ...glass({ padding: '24px 28px' }), marginBottom: 20, animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.05s both' }}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 20px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 18px', display: 'flex', alignItems: 'center', gap: 8 }}>
           <FileText size={16} color="#16A34A" /> Generate New Report
         </h2>
 
         {/* Quick presets */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <span style={{ fontSize: 11, color: '#78716C', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', alignSelf: 'center' }}>Quick range:</span>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' }}>
+          <span style={{ fontSize: 11, color: '#78716C', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Quick range:</span>
           {DATE_PRESETS.map(p => (
             <button key={p.days} onClick={() => applyPreset(p.days)} style={{
               padding: '5px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.5)',
@@ -546,9 +623,7 @@ export default function Reports({ profile }) {
             }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.55)'}
               onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.35)'}
-            >
-              {p.label}
-            </button>
+            >{p.label}</button>
           ))}
         </div>
 
@@ -574,7 +649,8 @@ export default function Reports({ profile }) {
               padding: '10px 24px', borderRadius: 12, border: 'none', height: 40,
               background: loading ? 'rgba(22,163,74,0.5)' : 'linear-gradient(135deg, #16A34A, #15803D)',
               color: '#fff', fontSize: 13, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
-              display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 2px 16px rgba(22,163,74,0.3)', fontFamily: 'var(--font)',
+              display: 'flex', alignItems: 'center', gap: 8,
+              boxShadow: '0 2px 16px rgba(22,163,74,0.3)', fontFamily: 'var(--font)',
             }}
           >
             {loading ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <FileText size={15} />}
@@ -630,13 +706,13 @@ export default function Reports({ profile }) {
         </div>
       )}
 
-      {/* ── Inline Report View ── */}
+      {/* ── Inline Report Output ── */}
       {report && (
         <div style={{ animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) both' }}>
-          {/* Report actions bar */}
+          {/* Actions bar (glass, hidden on print) */}
           <div className="no-print" style={{ ...glass({ padding: '12px 20px', marginBottom: 16, borderRadius: 14 }), display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#57534E' }}>
-              Report: {report.station.name} · {fmtDate(report.from)} – {fmtDate(report.to)} · {report.readings.length} readings
+              {report.station.name} · {fmtDate(report.from)} – {fmtDate(report.to)} · {report.readings.length} raw readings
             </p>
             <div style={{ display: 'flex', gap: 10 }}>
               <button
