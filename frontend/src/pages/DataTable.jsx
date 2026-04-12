@@ -642,7 +642,7 @@ export default function DataTable({ profile }) {
             <label style={{ fontSize: 10, fontWeight: 700, color: '#78716C', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5, display: 'block' }}>
               Time Range
             </label>
-            <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
               {PRESETS.map(p => (
                 <button
                   key={p.hours}
@@ -763,7 +763,7 @@ export default function DataTable({ profile }) {
           </div>
 
           {/* Search */}
-          <div style={{ position: 'relative', flex: 1, minWidth: 180, maxWidth: 300 }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 160, maxWidth: isMobile ? '100%' : 300 }}>
             <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#A8A29E', pointerEvents: 'none' }} />
             <input
               type="text"

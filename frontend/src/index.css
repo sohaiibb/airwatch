@@ -16,7 +16,8 @@
   --mono: 'DM Mono', 'SF Mono', monospace;
 }
 *{margin:0;padding:0;box-sizing:border-box}
-html,body,#root{min-height:100vh;background:var(--bg);font-family:var(--font);color:var(--text);-webkit-font-smoothing:antialiased}
+html,body,#root{min-height:100vh;background:var(--bg);font-family:var(--font);color:var(--text);-webkit-font-smoothing:antialiased;overflow-x:hidden;max-width:100vw}
+img,video{max-width:100%;height:auto}
 ::-webkit-scrollbar{width:5px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.1);border-radius:10px}

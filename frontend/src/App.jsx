@@ -214,7 +214,7 @@ export default function App() {
         </div>
       </aside>
 
-      <main style={{ flex: 1, marginLeft: isMobile ? 0 : (sidebarOpen ? 240 : 64), transition: 'margin-left 0.3s cubic-bezier(.16,1,.3,1)', position: 'relative', zIndex: 1, padding: isMobile ? '60px 12px 24px' : 24, maxWidth: 1400 }}>
+      <main style={{ flex: 1, marginLeft: isMobile ? 0 : (sidebarOpen ? 240 : 64), transition: 'margin-left 0.3s cubic-bezier(.16,1,.3,1)', position: 'relative', zIndex: 1, padding: isMobile ? '60px 12px 24px' : 24, maxWidth: 1400, overflowX: 'hidden', width: isMobile ? '100%' : undefined, minWidth: 0 }}>
         {renderPage()}
       </main>
     </div>

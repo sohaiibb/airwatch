@@ -8,6 +8,12 @@ const EMPTY = { name:'',slug:'',description:'',latitude:'',longitude:'',device_i
 const FIELDS = {pm25:'PM2.5',pm10:'PM10',so2:'SO₂',no2:'NO₂',o3:'O₃',co:'CO',temperature:'Temperature',humidity:'Humidity',pressure:'Pressure',wind_speed:'Wind Speed',wind_direction:'Wind Dir'};
 
 export default function AdminStations() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const h = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', h);
+    return () => window.removeEventListener('resize', h);
+  }, []);
   const [stations,setStations]=useState([]);
   const [loading,setLoading]=useState(true);
   const [editing,setEditing]=useState(null);
@@ -40,7 +46,7 @@ export default function AdminStations() {
         <button onClick={()=>{setEditing({...EMPTY,_isNew:true});setMsg('');}} style={{...glassInner({padding:'8px 16px',borderRadius:12}),display:'flex',alignItems:'center',gap:6,border:'none',cursor:'pointer',fontSize:13,fontWeight:600,color:'#16A34A',fontFamily:'var(--font)'}}><Plus size={16}/>Add Station</button>
       </div>
 
-      <div style={{display:'grid',gridTemplateColumns:editing?'1fr 1fr':'1fr',gap:16}}>
+      <div style={{display:'grid',gridTemplateColumns:editing && !isMobile ?'1fr 1fr':'1fr',gap:16}}>
         <div style={{...glass({padding:'16px'}),animation:'glassIn 0.5s ease both'}}>
           {loading?<div style={{textAlign:'center',padding:40}}><Loader2 size={24} color="#A8A29E" style={{animation:'spin 1s linear infinite'}}/></div>
           :stations.length===0?<div style={{textAlign:'center',padding:40,color:'#A8A29E'}}><Radio size={32} style={{marginBottom:8,opacity:.4}}/><p style={{fontWeight:600}}>No stations yet</p></div>
@@ -72,7 +78,7 @@ export default function AdminStations() {
             {msg&&<div style={{padding:'8px 12px',borderRadius:10,marginBottom:14,fontSize:12,fontWeight:600,background:msg.includes('Error')?'rgba(220,38,38,0.08)':'rgba(22,163,74,0.08)',color:msg.includes('Error')?'#DC2626':'#16A34A',border:`1px solid ${msg.includes('Error')?'rgba(220,38,38,0.2)':'rgba(22,163,74,0.2)'}`}}>{msg}</div>}
 
             <p style={{fontSize:11,fontWeight:700,color:'#78716C',marginBottom:8,textTransform:'uppercase',letterSpacing:'0.06em'}}>Basic Info</p>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:10,marginBottom:16}}>
               <div><label style={{fontSize:11,fontWeight:600,color:'#57534E',display:'block',marginBottom:4}}>Station Name *</label><input value={editing.name} onChange={e=>setEditing({...editing,name:e.target.value})} placeholder="Al Khobar Central" style={inp}/></div>
               <div><label style={{fontSize:11,fontWeight:600,color:'#57534E',display:'block',marginBottom:4}}>Device ID</label><input value={editing.device_id} onChange={e=>setEditing({...editing,device_id:e.target.value})} placeholder="ENE04771" style={inp}/></div>
               <div><label style={{fontSize:11,fontWeight:600,color:'#57534E',display:'block',marginBottom:4}}>Latitude *</label><input value={editing.latitude} onChange={e=>setEditing({...editing,latitude:e.target.value})} placeholder="26.2956" style={inp} type="number" step="0.0001"/></div>
@@ -80,14 +86,14 @@ export default function AdminStations() {
             </div>
 
             <p style={{fontSize:11,fontWeight:700,color:'#78716C',marginBottom:8,textTransform:'uppercase',letterSpacing:'0.06em'}}>Data Source</p>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:10,marginBottom:10}}>
               <div><label style={{fontSize:11,fontWeight:600,color:'#57534E',display:'block',marginBottom:4}}>API Base URL</label><input value={editing.api_base_url} onChange={e=>setEditing({...editing,api_base_url:e.target.value})} placeholder="https://apis.enggenv.com/api/v1/uz/data" style={inp}/></div>
               <div><label style={{fontSize:11,fontWeight:600,color:'#57534E',display:'block',marginBottom:4}}>Polling (sec)</label><input value={editing.polling_interval_seconds} onChange={e=>setEditing({...editing,polling_interval_seconds:e.target.value})} style={inp} type="number"/></div>
             </div>
 
             <p style={{fontSize:11,fontWeight:700,color:'#78716C',margin:'16px 0 8px',textTransform:'uppercase',letterSpacing:'0.06em'}}>Field Mapping</p>
             <p style={{fontSize:10,color:'#A8A29E',marginBottom:10}}>Map API field names → dashboard parameters</p>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+            <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:6}}>
               {Object.entries(FIELDS).map(([k,label])=>(
                 <div key={k} style={{display:'flex',alignItems:'center',gap:8}}>
                   <span style={{fontSize:11,fontWeight:600,color:'#57534E',width:80,flexShrink:0}}>{label}</span>
