@@ -199,6 +199,14 @@ function doExportExcel(rows, stationName, fromStr, toStr, agg) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function DataTable({ profile }) {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isPhone, setIsPhone] = useState(window.innerWidth < 480);
+  useEffect(() => {
+    const handle = () => { setIsMobile(window.innerWidth < 768); setIsPhone(window.innerWidth < 480); };
+    window.addEventListener('resize', handle);
+    return () => window.removeEventListener('resize', handle);
+  }, []);
+
   const now       = new Date();
   const weekAgo   = new Date(now - 7 * 24 * 3600000);
 
@@ -608,7 +616,7 @@ export default function DataTable({ profile }) {
       <div style={{ ...glass({ padding: '16px 20px' }), marginBottom: 16, animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.05s both' }}>
 
         {/* Row 1: station + date presets + load all */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end', marginBottom: 12 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end', marginBottom: 12, flexDirection: isMobile ? 'column' : 'row' }}>
 
           {/* Station */}
           <div style={{ minWidth: 180 }}>
@@ -685,6 +693,7 @@ export default function DataTable({ profile }) {
             display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end',
             padding: '12px 14px', marginBottom: 12,
             background: `${TEAL}0a`, border: `1px solid ${TEAL}30`, borderRadius: 10,
+            flexDirection: isMobile ? 'column' : 'row',
           }}>
             <div>
               <label style={{ fontSize: 10, fontWeight: 700, color: '#78716C', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5, display: 'block' }}>
@@ -735,13 +744,14 @@ export default function DataTable({ profile }) {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
 
           {/* Aggregation toggle */}
-          <div style={{ display: 'flex', gap: 0, borderRadius: 9, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.5)' }}>
+          <div style={{ display: 'flex', gap: 0, borderRadius: 9, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.5)', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
             {AGG_OPTIONS.map(o => (
               <button
                 key={o.value}
                 onClick={() => handleAgg(o.value)}
                 style={{
-                  padding: '6px 14px', border: 'none', cursor: 'pointer',
+                  padding: isMobile ? '9px 14px' : '6px 14px', minHeight: isMobile ? 44 : undefined,
+                  border: 'none', cursor: 'pointer',
                   fontFamily: 'var(--font)', fontSize: 12, fontWeight: 600,
                   background: agg === o.value ? TEAL : 'rgba(255,255,255,0.38)',
                   color: agg === o.value ? '#fff' : '#57534E',
@@ -839,7 +849,7 @@ export default function DataTable({ profile }) {
                   {/* Timestamp header */}
                   <th
                     onClick={() => handleSort('timestamp')}
-                    style={{ ...thStyle('timestamp'), minWidth: 180, paddingLeft: 16 }}
+                    style={{ ...thStyle('timestamp'), minWidth: 180, paddingLeft: 16, position: 'sticky', left: 0, zIndex: 2 }}
                   >
                     <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                       Timestamp
@@ -877,6 +887,7 @@ export default function DataTable({ profile }) {
                       borderBottom: '1px solid rgba(0,0,0,0.05)',
                       background: i % 2 === 0 ? '#ffffff' : '#f8fafc',
                       color: '#374151', fontWeight: 500, whiteSpace: 'nowrap',
+                      position: 'sticky', left: 0, zIndex: 1,
                     }}>
                       {fmtTSAgg(r.timestamp, agg)}
                     </td>
@@ -914,13 +925,16 @@ export default function DataTable({ profile }) {
               </button>
 
               {/* Page numbers */}
-              {pageNumbers().map((p, i) =>
-                p === '…'
-                  ? <span key={`ellipsis-${i}`} style={{ padding: '0 5px', color: '#A8A29E', fontSize: 12 }}>…</span>
-                  : <button key={p} onClick={() => handlePage(p)} style={pageBtnStyle(p === page, false)}>
-                      {p + 1}
-                    </button>
-              )}
+              {isPhone
+                ? <span style={{ padding: '0 8px', fontSize: 12, color: '#78716C', fontFamily: 'DM Mono, monospace' }}>{page + 1} / {totalPages.toLocaleString()}</span>
+                : pageNumbers().map((p, i) =>
+                    p === '…'
+                      ? <span key={`ellipsis-${i}`} style={{ padding: '0 5px', color: '#A8A29E', fontSize: 12 }}>…</span>
+                      : <button key={p} onClick={() => handlePage(p)} style={pageBtnStyle(p === page, false)}>
+                          {p + 1}
+                        </button>
+                  )
+              }
 
               {/* Next */}
               <button onClick={() => handlePage(page + 1)} disabled={page >= totalPages - 1} style={pageBtnStyle(false, page >= totalPages - 1)}>

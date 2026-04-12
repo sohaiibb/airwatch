@@ -86,6 +86,14 @@ function FitBounds({ stations }) {
 
 // ═══ Dashboard Page ═══
 export default function Dashboard({ profile }) {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isPhone, setIsPhone] = useState(window.innerWidth < 480);
+  useEffect(() => {
+    const handle = () => { setIsMobile(window.innerWidth < 768); setIsPhone(window.innerWidth < 480); };
+    window.addEventListener('resize', handle);
+    return () => window.removeEventListener('resize', handle);
+  }, []);
+
   const [stations, setStations] = useState([]);
   const [readings, setReadings] = useState({});
   const [selIdx, setSelIdx] = useState(0);
@@ -187,7 +195,7 @@ export default function Dashboard({ profile }) {
       )}
 
       {/* Row 1: Map + AQI Gauge */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 16, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 280px', gap: 16, marginBottom: 16 }}>
         {/* Map */}
         <div style={{ ...glass({ padding: 0, overflow: 'hidden' }), animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.05s both', height: 300 }}>
           <MapContainer center={[26.4, 50.0]} zoom={8} style={{ height: '100%', width: '100%' }} zoomControl={true} attributionControl={false}>
@@ -268,7 +276,7 @@ export default function Dashboard({ profile }) {
       </div>
 
       {/* Row 3: Pollutant cards (6) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isPhone ? 'repeat(2, 1fr)' : isMobile ? 'repeat(3, 1fr)' : 'repeat(6, 1fr)', gap: 12, marginBottom: 16 }}>
         {POLLUTANTS.map((p, i) => (
           <StatCard key={p.key} icon={Activity} label={p.name} value={r[p.key]} unit={p.unit} accent={p.color}
             trend={r[p.key] != null ? (Math.random() > 0.5 ? 'up' : 'down') : undefined}
@@ -278,7 +286,7 @@ export default function Dashboard({ profile }) {
       </div>
 
       {/* Row 4: Weather cards (4) + Sparkline */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr) 1.5fr', gap: 12, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr) 1.5fr', gap: 12, marginBottom: 16 }}>
         <StatCard icon={Thermometer} label="Temperature" value={r.temperature} unit="°C" accent="#EF4444" delay={0.4} />
         <StatCard icon={Droplets} label="Humidity" value={r.humidity} unit="%" accent="#0EA5E9" delay={0.44} />
         <StatCard icon={Wind} label="Wind Speed" value={r.wind_speed} unit="m/s" accent="#8B5CF6" delay={0.48} />
@@ -305,7 +313,7 @@ export default function Dashboard({ profile }) {
       </div>
 
       {/* Row 5: Compliance summary + Health Advisory */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 16 }}>
         {/* Compliance summary */}
         <div style={{ ...glass({ padding: '20px 22px' }), animation: 'glassIn 0.6s cubic-bezier(.16,1,.3,1) 0.55s both', display: 'flex', flexDirection: 'column' }}>
           <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 3px' }}>Current Readings</h2>

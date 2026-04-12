@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase, getProfile } from './lib/supabase';
 import { glass, glassInner } from './lib/utils';
-import { LayoutDashboard, BarChart3, FileText, Bell, Settings, LogOut, Wind, ChevronRight, Shield, Users, Radio, Loader2, Compass, Database } from 'lucide-react';
+import { LayoutDashboard, BarChart3, FileText, Bell, Settings, LogOut, Wind, ChevronRight, Shield, Users, Radio, Loader2, Compass, Database, Menu } from 'lucide-react';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Charts from './pages/Charts';
@@ -63,7 +63,16 @@ export default function App() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState('dashboard');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
+  useEffect(() => {
+    const handle = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+    };
+    window.addEventListener('resize', handle);
+    return () => window.removeEventListener('resize', handle);
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -128,10 +137,40 @@ export default function App() {
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, #10B981, #3B82F6, #8B5CF6, #EC4899, #F59E0B, #10B981)', backgroundSize: '200% 100%', animation: 'shimmer 8s linear infinite', opacity: 0.5 }} />
       </div>
 
+      {/* Mobile hamburger button */}
+      {isMobile && (
+        <button
+          onClick={() => setSidebarOpen(true)}
+          style={{
+            display: sidebarOpen ? 'none' : 'flex',
+            position: 'fixed', top: 14, left: 14, zIndex: 40,
+            width: 40, height: 40, borderRadius: 10,
+            alignItems: 'center', justifyContent: 'center',
+            ...glassInner(), border: '1px solid rgba(255,255,255,0.5)',
+            cursor: 'pointer',
+          }}
+        >
+          <Menu size={18} color="#44403C" />
+        </button>
+      )}
+
+      {/* Mobile backdrop */}
+      {isMobile && sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 25,
+            background: 'rgba(0,0,0,0.4)',
+          }}
+        />
+      )}
+
       {/* Sidebar */}
       <aside style={{
         ...glass({ borderRadius: 0, border: 'none', borderRight: '1px solid rgba(255,255,255,0.4)' }),
-        width: sidebarOpen ? 240 : 64, transition: 'width 0.3s cubic-bezier(.16,1,.3,1)',
+        width: isMobile ? 240 : (sidebarOpen ? 240 : 64),
+        transform: isMobile ? (sidebarOpen ? 'translateX(0)' : 'translateX(-100%)') : 'translateX(0)',
+        transition: isMobile ? 'transform 0.3s cubic-bezier(.16,1,.3,1)' : 'width 0.3s cubic-bezier(.16,1,.3,1)',
         display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, bottom: 0, left: 0, zIndex: 30, overflow: 'hidden',
       }}>
         <div style={{ padding: sidebarOpen ? '20px 20px 16px' : '20px 14px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid rgba(255,255,255,0.3)' }}>
@@ -151,11 +190,11 @@ export default function App() {
 
         <nav style={{ flex: 1, padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
           {sidebarOpen && <p style={{ fontSize: 10, fontWeight: 700, color: '#A8A29E', letterSpacing: '0.08em', textTransform: 'uppercase', padding: '8px 12px 4px' }}>MONITOR</p>}
-          {NAV_CLIENT.map(i => <NavItem key={i.id} item={i} active={page === i.id} onClick={() => setPage(i.id)} collapsed={!sidebarOpen} />)}
+          {NAV_CLIENT.map(i => <NavItem key={i.id} item={i} active={page === i.id} onClick={() => { setPage(i.id); if (isMobile) setSidebarOpen(false); }} collapsed={!sidebarOpen} />)}
           {isAdmin && <>
             {sidebarOpen && <p style={{ fontSize: 10, fontWeight: 700, color: '#A8A29E', letterSpacing: '0.08em', textTransform: 'uppercase', padding: '16px 12px 4px' }}>ADMIN</p>}
             {!sidebarOpen && <div style={{ borderTop: '1px solid rgba(255,255,255,0.3)', margin: '8px 4px' }} />}
-            {NAV_ADMIN.map(i => <NavItem key={i.id} item={i} active={page === i.id} onClick={() => setPage(i.id)} collapsed={!sidebarOpen} />)}
+            {NAV_ADMIN.map(i => <NavItem key={i.id} item={i} active={page === i.id} onClick={() => { setPage(i.id); if (isMobile) setSidebarOpen(false); }} collapsed={!sidebarOpen} />)}
           </>}
         </nav>
 
@@ -175,7 +214,7 @@ export default function App() {
         </div>
       </aside>
 
-      <main style={{ flex: 1, marginLeft: sidebarOpen ? 240 : 64, transition: 'margin-left 0.3s cubic-bezier(.16,1,.3,1)', position: 'relative', zIndex: 1, padding: 24, maxWidth: 1400 }}>
+      <main style={{ flex: 1, marginLeft: isMobile ? 0 : (sidebarOpen ? 240 : 64), transition: 'margin-left 0.3s cubic-bezier(.16,1,.3,1)', position: 'relative', zIndex: 1, padding: isMobile ? '60px 12px 24px' : 24, maxWidth: 1400 }}>
         {renderPage()}
       </main>
     </div>

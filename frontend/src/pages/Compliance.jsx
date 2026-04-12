@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Shield, CheckCircle, XCircle, AlertTriangle, Loader2, Info } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { getStations, getReadingsByDateRange, getDemoStations, getDemoHistory } from '../lib/supabase';
+import { supabase, getStations, getDemoStations, getDemoHistory } from '../lib/supabase';
 import { glass, glassInner, NCEC_STANDARDS, POLLUTANTS } from '../lib/utils';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -110,14 +110,22 @@ export default function Compliance({ profile }) {
   const today = new Date().toISOString().slice(0, 10);
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
 
-  const [stations, setStations]     = useState([]);
-  const [selIdx, setSelIdx]         = useState(0);
-  const [period, setPeriod]         = useState('24-hour');
-  const [from, setFrom]             = useState(weekAgo);
-  const [to, setTo]                 = useState(today);
-  const [readings, setReadings]     = useState([]);
-  const [loading, setLoading]       = useState(false);
-  const [isDemo, setIsDemo]         = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const h = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', h);
+    return () => window.removeEventListener('resize', h);
+  }, []);
+
+  const [stations, setStations]       = useState([]);
+  const [selIdx, setSelIdx]           = useState(0);
+  const [period, setPeriod]           = useState('24-hour');
+  const [from, setFrom]               = useState(weekAgo);
+  const [to, setTo]                   = useState(today);
+  const [readings, setReadings]       = useState([]);
+  const [loading, setLoading]         = useState(false);
+  const [loadingCount, setLoadingCount] = useState(0);
+  const [isDemo, setIsDemo]           = useState(false);
 
   // Load stations
   useEffect(() => {
@@ -133,13 +141,33 @@ export default function Compliance({ profile }) {
     const station = stations[selIdx];
     if (!station) return;
     setLoading(true);
+    setLoadingCount(0);
     const load = async () => {
       try {
         if (isDemo) {
           const hours = Math.max(1, Math.ceil((new Date(to) - new Date(from)) / 3600000));
           setReadings(getDemoHistory(station.id, Math.min(hours, 720)));
         } else {
-          setReadings(await getReadingsByDateRange(station.id, from + 'T00:00:00', to + 'T23:59:59'));
+          // Chunked pagination — PostgREST caps at 1,000 rows per request
+          const fromISO = from + 'T00:00:00';
+          const toISO   = to   + 'T23:59:59';
+          const CHUNK   = 1000;
+          let all = [], offset = 0;
+          while (true) {
+            const { data, error: e } = await supabase
+              .from('readings').select('*')
+              .eq('station_id', station.id)
+              .gte('timestamp', fromISO).lte('timestamp', toISO)
+              .order('timestamp', { ascending: true })
+              .range(offset, offset + CHUNK - 1);
+            if (e) throw new Error(e.message);
+            if (!data || !data.length) break;
+            all = all.concat(data);
+            setLoadingCount(all.length);
+            if (data.length < CHUNK) break;
+            offset += CHUNK;
+          }
+          setReadings(all);
         }
       } catch { setReadings([]); }
       setLoading(false);
@@ -189,7 +217,7 @@ export default function Compliance({ profile }) {
       )}
 
       {/* Controls */}
-      <div style={{ ...glass({ padding: '16px 20px', marginBottom: 16 }), display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.05s both' }}>
+      <div style={{ ...glass({ padding: '16px 20px', marginBottom: 16 }), display: 'flex', gap: 12, alignItems: isMobile ? 'stretch' : 'center', flexWrap: 'wrap', flexDirection: isMobile ? 'column' : 'row', animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.05s both' }}>
         {/* Station */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span style={{ fontSize: 10, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Station</span>
@@ -221,11 +249,16 @@ export default function Compliance({ profile }) {
           </div>
         </div>
 
-        {loading && <Loader2 size={16} color="#A8A29E" style={{ animation: 'spin 1s linear infinite', marginLeft: 'auto' }} />}
+        {loading && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, color: '#78716C', fontSize: 12 }}>
+            <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+            {loadingCount > 0 ? `Fetching… ${loadingCount.toLocaleString()} readings` : 'Loading…'}
+          </div>
+        )}
       </div>
 
       {/* Summary cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 14, marginBottom: 16 }}>
         {[
           {
             label: 'Overall Status',
@@ -288,7 +321,8 @@ export default function Compliance({ profile }) {
             <p style={{ fontSize: 11, marginTop: 4 }}>Try selecting 1-Hour or 24-Hour.</p>
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
             <thead>
               <tr>
                 {['Pollutant', 'Unit', 'Avg. Period', 'NCEC Limit', 'Measured Avg', 'Measured Max', 'No. Exceedances', 'Allowed', 'Status'].map(h => (
@@ -322,6 +356,7 @@ export default function Compliance({ profile }) {
               })}
             </tbody>
           </table>
+        </div>
         )}
       </div>
 

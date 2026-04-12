@@ -674,6 +674,14 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt, avgPeriod,
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function Reports({ profile }) {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isPhone, setIsPhone] = useState(window.innerWidth < 480);
+  useEffect(() => {
+    const handle = () => { setIsMobile(window.innerWidth < 768); setIsPhone(window.innerWidth < 480); };
+    window.addEventListener('resize', handle);
+    return () => window.removeEventListener('resize', handle);
+  }, []);
+
   const now     = new Date();
   const dayAgo  = new Date(now - 86400000);
 
@@ -860,7 +868,8 @@ export default function Reports({ profile }) {
       : { background: 'rgba(255,255,255,0.45)', color: '#1C1917', border: '1px solid rgba(255,255,255,0.6)' }),
   });
   const pillBtn = (active) => ({
-    padding: '4px 12px', borderRadius: 7,
+    padding: isMobile ? '8px 12px' : '4px 12px', borderRadius: 7,
+    minHeight: isMobile ? 44 : undefined,
     border: active ? `1px solid ${TEAL}` : '1px solid rgba(255,255,255,0.55)',
     background: active ? TEAL : 'rgba(255,255,255,0.38)',
     fontSize: 11, fontWeight: 600, cursor: 'pointer',
@@ -924,7 +933,7 @@ export default function Reports({ profile }) {
           <div style={{ display: 'flex', gap: 7, alignItems: 'center', marginBottom: 10 }}>
             <span style={{ fontSize: 10, fontWeight: 700, color: '#A8A29E', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Parameters:</span>
           </div>
-          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', flexDirection: isMobile ? 'column' : 'row' }}>
             {PARAM_GROUPS.map(group => (
               <div key={group.label} style={{ flex: 1, minWidth: 200 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
@@ -970,7 +979,7 @@ export default function Reports({ profile }) {
         </div>
 
         {/* Station + date-time inputs */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', gap: 14, marginBottom: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.4fr 1fr 1fr', gap: 14, marginBottom: 18 }}>
           <div>
             <label style={labelSt}>Station</label>
             <select value={stationId} onChange={e => setStationId(e.target.value)} style={inputSt}>
@@ -1063,11 +1072,11 @@ export default function Reports({ profile }) {
       {report && (
         <div style={{ animation: 'glassIn 0.4s cubic-bezier(.16,1,.3,1) both' }}>
           {/* Preview toolbar (hidden on print) */}
-          <div className="no-print" style={{ ...glass({ padding: '11px 18px', marginBottom: 14, borderRadius: 12 }), display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="no-print" style={{ ...glass({ padding: '11px 18px', marginBottom: 14, borderRadius: 12 }), display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
             <p style={{ fontSize: 12, fontWeight: 600, margin: 0, color: '#57534E' }}>
               Preview — {report.station.name} · {report.readings.length} raw readings
             </p>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button
                 onClick={() => { setReport(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                 style={{ padding: '7px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#57534E', fontFamily: 'var(--font)' }}
@@ -1087,7 +1096,7 @@ export default function Reports({ profile }) {
           </div>
 
           {/* Report — clean white container */}
-          <div style={{ background: '#fff', border: '1px solid #E7E5E4', borderRadius: 12, padding: '28px 32px', boxShadow: '0 2px 16px rgba(0,0,0,0.06)' }}>
+          <div style={{ background: '#fff', border: '1px solid #E7E5E4', borderRadius: 12, padding: isMobile ? '16px 12px' : '28px 32px', boxShadow: '0 2px 16px rgba(0,0,0,0.06)', overflowX: 'auto' }}>
             <ReportView
               station={report.station}
               fromISO={report.fromISO}

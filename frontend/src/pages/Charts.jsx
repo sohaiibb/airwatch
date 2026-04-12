@@ -161,6 +161,14 @@ function SortArrow({ col, sortKey, sortDir }) {
 
 // ═══ Charts Page ═══
 export default function Charts({ profile }) {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isPhone, setIsPhone] = useState(window.innerWidth < 480);
+  useEffect(() => {
+    const handle = () => { setIsMobile(window.innerWidth < 768); setIsPhone(window.innerWidth < 480); };
+    window.addEventListener('resize', handle);
+    return () => window.removeEventListener('resize', handle);
+  }, []);
+
   const { stationId } = useParams();
   const [stations, setStations]     = useState([]);
   const [selIdx, setSelIdx]         = useState(0);
@@ -295,7 +303,7 @@ export default function Charts({ profile }) {
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
       {/* Header: Station selector + Time range */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12, flexDirection: isMobile ? 'column' : 'row' }}>
         <div style={{ ...glassInner({ padding: '4px 6px', borderRadius: 12 }), display: 'flex', gap: 3, overflowX: 'auto' }}>
           {stations.map((s, i) => (
             <button key={s.id} onClick={() => setSelIdx(i)} style={{
@@ -311,7 +319,8 @@ export default function Charts({ profile }) {
           <div style={{ ...glassInner({ padding: '3px 4px', borderRadius: 10 }), display: 'flex', gap: 2 }}>
             {['1h', '6h', '12h', '24h', '7d', '30d'].map(t => (
               <button key={t} onClick={() => setTimeRange(t)} style={{
-                padding: '5px 10px', borderRadius: 7, border: 'none', cursor: 'pointer',
+                padding: isMobile ? '8px 10px' : '5px 10px', minHeight: isMobile ? 44 : undefined,
+                borderRadius: 7, border: 'none', cursor: 'pointer',
                 fontSize: 11, fontWeight: 600, fontFamily: 'var(--font-mono)',
                 background: timeRange === t ? 'rgba(255,255,255,0.7)' : 'transparent',
                 color: timeRange === t ? '#1C1917' : '#A8A29E',
@@ -334,7 +343,7 @@ export default function Charts({ profile }) {
       </div>
 
       {/* Gas charts grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 14, marginBottom: 16 }}>
         {POLLUTANTS.map(p => <GasChart key={p.key} pollutant={p} data={data} />)}
       </div>
 
@@ -418,7 +427,7 @@ export default function Charts({ profile }) {
             <thead>
               <tr>
                 {/* Timestamp */}
-                <th style={thStyle('timestamp')} onClick={() => handleSort('timestamp')}>
+                <th style={{ ...thStyle('timestamp'), position: 'sticky', left: 0, zIndex: 2, background: sortKey === 'timestamp' ? 'rgba(240,237,233,0.95)' : 'rgba(232,228,222,0.95)' }} onClick={() => handleSort('timestamp')}>
                   Timestamp <SortArrow col="timestamp" sortKey={sortKey} sortDir={sortDir} />
                 </th>
                 {/* Count (aggregated modes) */}
@@ -462,7 +471,7 @@ export default function Charts({ profile }) {
                   onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? 'rgba(255,255,255,0.15)' : 'transparent'}
                 >
                   {/* Timestamp */}
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap', color: '#57534E' }}>
+                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap', color: '#57534E', position: 'sticky', left: 0, zIndex: 1, background: 'inherit' }}>
                     {fmtTs(row.timestamp)}
                   </td>
                   {/* Count */}
@@ -511,19 +520,22 @@ export default function Charts({ profile }) {
             ><ChevronLeft size={13} /></button>
 
             {/* Page number pills */}
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              const offset = Math.max(0, Math.min(page - 2, totalPages - 5));
-              const pg = offset + i;
-              return (
-                <button key={pg} onClick={() => setPage(pg)} style={{
-                  width: 28, height: 28, borderRadius: 7, border: 'none', cursor: 'pointer',
-                  background: pg === page ? 'rgba(255,255,255,0.7)' : 'transparent',
-                  boxShadow: pg === page ? '0 1px 3px rgba(0,0,0,0.07)' : 'none',
-                  fontSize: 11, fontWeight: pg === page ? 700 : 400, color: pg === page ? '#1C1917' : '#78716C',
-                  fontFamily: 'var(--font-mono)',
-                }}>{pg + 1}</button>
-              );
-            })}
+            {isPhone
+              ? <span style={{ fontSize: 11, color: '#78716C', fontFamily: 'var(--font-mono)', padding: '0 6px' }}>{page + 1} / {totalPages}</span>
+              : Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const offset = Math.max(0, Math.min(page - 2, totalPages - 5));
+                  const pg = offset + i;
+                  return (
+                    <button key={pg} onClick={() => setPage(pg)} style={{
+                      width: 28, height: 28, borderRadius: 7, border: 'none', cursor: 'pointer',
+                      background: pg === page ? 'rgba(255,255,255,0.7)' : 'transparent',
+                      boxShadow: pg === page ? '0 1px 3px rgba(0,0,0,0.07)' : 'none',
+                      fontSize: 11, fontWeight: pg === page ? 700 : 400, color: pg === page ? '#1C1917' : '#78716C',
+                      fontFamily: 'var(--font-mono)',
+                    }}>{pg + 1}</button>
+                  );
+                })
+            }
 
             <button
               onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
