@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase, getProfile } from './lib/supabase';
 import { glass, glassInner } from './lib/utils';
-import { LayoutDashboard, BarChart3, FileText, Bell, Settings, LogOut, Wind, ChevronRight, Shield, Users, Radio, Loader2, Compass } from 'lucide-react';
+import { LayoutDashboard, BarChart3, FileText, Bell, Settings, LogOut, Wind, ChevronRight, Shield, Users, Radio, Loader2, Compass, Database } from 'lucide-react';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Charts from './pages/Charts';
@@ -9,10 +9,12 @@ import Compliance from './pages/Compliance';
 import WindRosePage from './pages/WindRose';
 import AdminStations from './pages/AdminStations';
 import Reports from './pages/Reports';
+import DataTable from './pages/DataTable';
 
 const NAV_CLIENT = [
   { id: 'dashboard',  label: 'Dashboard',  icon: LayoutDashboard },
   { id: 'charts',     label: 'Charts',     icon: BarChart3 },
+  { id: 'data',       label: 'Data',       icon: Database },
   { id: 'compliance', label: 'Compliance', icon: Shield },
   { id: 'wind-rose',  label: 'Wind Rose',  icon: Compass },
   { id: 'reports',    label: 'Reports',    icon: FileText },
@@ -106,6 +108,7 @@ export default function App() {
       case 'compliance': return <Compliance profile={profile} />;
       case 'wind-rose':  return <WindRosePage profile={profile} />;
       case 'admin-stations': return isAdmin ? <AdminStations /> : <Dashboard profile={profile} />;
+      case 'data':    return <DataTable profile={profile} />;
       case 'reports': return <Reports profile={profile} />;
       case 'alerts': return <Placeholder title="Alerts" desc="Coming in Phase 2." icon={Bell} />;
       case 'settings': return <Placeholder title="Settings" desc="Coming in Phase 2." icon={Settings} />;
