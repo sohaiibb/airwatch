@@ -99,9 +99,25 @@ export default function Dashboard({ profile }) {
   const [selIdx, setSelIdx] = useState(0);
   const [sparkData, setSparkData] = useState({});
   const [isDemo, setIsDemo] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const navigate = useNavigate();
   const stationsRef = useRef([]);
   const wsRef = useRef(null);
+
+  async function refreshReadings(stationList) {
+    const r = await getLatestReadings(stationList.map(s => s.id));
+    setReadings(r);
+    setLastUpdated(new Date());
+    // Debug: log what the Dashboard received vs what timestamps are in the data
+    stationList.forEach(s => {
+      const reading = r[s.id];
+      if (reading) {
+        console.log(`[Dashboard] ${s.name} — timestamp: ${reading.timestamp}, pm25: ${reading.pm25}, pm10: ${reading.pm10}, aqi: ${reading.aqi}`);
+      } else {
+        console.warn(`[Dashboard] ${s.name} — no reading found`);
+      }
+    });
+  }
 
   useEffect(() => {
     async function load() {
@@ -110,8 +126,7 @@ export default function Dashboard({ profile }) {
         if (st.length > 0) {
           setStations(st);
           stationsRef.current = st;
-          const r = await getLatestReadings(st.map(s => s.id));
-          setReadings(r);
+          await refreshReadings(st);
           setIsDemo(false);
         } else throw new Error('No stations');
       } catch {
@@ -119,6 +134,7 @@ export default function Dashboard({ profile }) {
         setStations(demo);
         stationsRef.current = demo;
         setReadings(getDemoReadings());
+        setLastUpdated(new Date());
         setIsDemo(true);
       }
     }
@@ -140,7 +156,7 @@ export default function Dashboard({ profile }) {
         try {
           const msg = JSON.parse(e.data);
           if (msg.type === 'update' && stationsRef.current.length) {
-            getLatestReadings(stationsRef.current.map(s => s.id)).then(setReadings);
+            refreshReadings(stationsRef.current);
           }
         } catch {}
       };
@@ -151,6 +167,15 @@ export default function Dashboard({ profile }) {
       cancelled = true;
       wsRef.current?.close();
     };
+  }, [isDemo]);
+
+  // Fallback polling: refresh every 60 seconds even if no WebSocket
+  useEffect(() => {
+    if (isDemo || !stationsRef.current.length) return;
+    const interval = setInterval(() => {
+      if (stationsRef.current.length) refreshReadings(stationsRef.current);
+    }, 60000);
+    return () => clearInterval(interval);
   }, [isDemo]);
 
   // Load sparkline data for selected station
@@ -241,6 +266,11 @@ export default function Dashboard({ profile }) {
             <span style={{ color: lvl.color, fontSize: 11, fontWeight: 700 }}>{lvl.label}</span>
           </div>
           <p style={{ color: '#78716C', fontSize: 11, fontWeight: 600, marginTop: 8, zIndex: 1, textAlign: 'center' }}>{station.name || '—'}</p>
+          {r.timestamp && (
+            <p style={{ color: '#A8A29E', fontSize: 9, fontFamily: 'var(--mono)', marginTop: 3, zIndex: 1, textAlign: 'center' }}>
+              {new Date(r.timestamp).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}
+            </p>
+          )}
           <button onClick={() => navigate(`/charts/${station.id}`)} style={{
             marginTop: 8, padding: '6px 14px', borderRadius: 10, border: 'none', cursor: 'pointer',
             background: 'rgba(255,255,255,0.35)', color: '#3B82F6', fontSize: 11, fontWeight: 600,
@@ -255,7 +285,7 @@ export default function Dashboard({ profile }) {
       </div>
 
       {/* Row 2: Station selector tabs */}
-      <div style={{ ...glass({ padding: '8px 10px', marginBottom: 16 }), display: 'flex', gap: 4, overflowX: 'auto', animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.15s both' }}>
+      <div style={{ ...glass({ padding: '8px 10px', marginBottom: 16 }), display: 'flex', gap: 4, overflowX: 'auto', alignItems: 'center', animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.15s both' }}>
         {stations.map((s, i) => {
           const sr = readings[s.id] || {};
           const sl = getAqiLevel(sr.aqi || 0);
@@ -273,6 +303,11 @@ export default function Dashboard({ profile }) {
             </button>
           );
         })}
+        {lastUpdated && !isDemo && (
+          <span style={{ marginLeft: 'auto', flexShrink: 0, fontSize: 10, color: '#A8A29E', fontFamily: 'var(--mono)', whiteSpace: 'nowrap', paddingLeft: 8 }}>
+            Updated {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
+          </span>
+        )}
       </div>
 
       {/* Row 3: Pollutant cards (6) */}
