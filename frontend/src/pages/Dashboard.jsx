@@ -304,16 +304,30 @@ export default function Dashboard({ profile }) {
         </div>
       </div>
 
-      {/* Row 5: Pollutant bars + Health Advisory */}
+      {/* Row 5: Compliance summary + Health Advisory */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-        {/* Pollutant breakdown */}
-        <div style={{ ...glass({ padding: '20px 22px' }), animation: 'glassIn 0.6s cubic-bezier(.16,1,.3,1) 0.55s both' }}>
-          <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 3px' }}>NCEC Threshold Status</h2>
-          <p style={{ color: '#A8A29E', fontSize: 11, margin: '0 0 16px' }}>Current levels vs. NCEC limits</p>
+        {/* Compliance summary */}
+        <div style={{ ...glass({ padding: '20px 22px' }), animation: 'glassIn 0.6s cubic-bezier(.16,1,.3,1) 0.55s both', display: 'flex', flexDirection: 'column' }}>
+          <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 3px' }}>Current Readings</h2>
+          <p style={{ color: '#A8A29E', fontSize: 11, margin: '0 0 14px' }}>Live pollutant levels vs. NCEC limits</p>
           {POLLUTANTS.map((p, i) => <PollutantBar key={i} name={p.name} value={r[p.key]} max={p.max} unit={p.unit} color={p.color} threshold={p.threshold} />)}
-          <div style={{ ...glassInner({ padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }) }}>
-            <Leaf size={12} color="#16A34A" />
-            <span style={{ color: '#78716C', fontSize: 10, lineHeight: 1.4 }}>Thresholds: NCEC Executive Regulation (Royal Decree M/165)</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
+            <div style={{ ...glassInner({ padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 6 }) }}>
+              <Leaf size={12} color="#16A34A" />
+              <span style={{ color: '#78716C', fontSize: 10 }}>NCEC Royal Decree M/165</span>
+            </div>
+            {(() => {
+              const over = POLLUTANTS.filter(p => r[p.key] != null && r[p.key] > p.threshold).length;
+              const compliant = over === 0;
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 20, background: compliant ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.10)', border: `1px solid ${compliant ? 'rgba(22,163,74,0.25)' : 'rgba(220,38,38,0.25)'}` }}>
+                  <Shield size={11} color={compliant ? '#16A34A' : '#DC2626'} />
+                  <span style={{ fontSize: 11, fontWeight: 700, color: compliant ? '#16A34A' : '#DC2626' }}>
+                    {compliant ? 'All Compliant' : `${over} Exceeded`}
+                  </span>
+                </div>
+              );
+            })()}
           </div>
         </div>
 

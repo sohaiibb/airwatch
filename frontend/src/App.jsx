@@ -1,19 +1,23 @@
 import { useState, useEffect } from 'react';
 import { supabase, getProfile } from './lib/supabase';
 import { glass, glassInner } from './lib/utils';
-import { LayoutDashboard, BarChart3, FileText, Bell, Settings, LogOut, Wind, ChevronRight, Shield, Users, Radio, Loader2 } from 'lucide-react';
+import { LayoutDashboard, BarChart3, FileText, Bell, Settings, LogOut, Wind, ChevronRight, Shield, Users, Radio, Loader2, Compass } from 'lucide-react';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Charts from './pages/Charts';
+import Compliance from './pages/Compliance';
+import WindRosePage from './pages/WindRose';
 import AdminStations from './pages/AdminStations';
 import Reports from './pages/Reports';
 
 const NAV_CLIENT = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'charts', label: 'Charts', icon: BarChart3 },
-  { id: 'reports', label: 'Reports', icon: FileText },
-  { id: 'alerts', label: 'Alerts', icon: Bell },
-  { id: 'settings', label: 'Settings', icon: Settings },
+  { id: 'dashboard',  label: 'Dashboard',  icon: LayoutDashboard },
+  { id: 'charts',     label: 'Charts',     icon: BarChart3 },
+  { id: 'compliance', label: 'Compliance', icon: Shield },
+  { id: 'wind-rose',  label: 'Wind Rose',  icon: Compass },
+  { id: 'reports',    label: 'Reports',    icon: FileText },
+  { id: 'alerts',     label: 'Alerts',     icon: Bell },
+  { id: 'settings',   label: 'Settings',   icon: Settings },
 ];
 const NAV_ADMIN = [
   { id: 'admin-stations', label: 'Manage Stations', icon: Radio },
@@ -97,8 +101,10 @@ export default function App() {
 
   function renderPage() {
     switch (page) {
-      case 'dashboard': return <Dashboard profile={profile} />;
-      case 'charts': return <Charts profile={profile} />;
+      case 'dashboard':  return <Dashboard profile={profile} />;
+      case 'charts':     return <Charts profile={profile} />;
+      case 'compliance': return <Compliance profile={profile} />;
+      case 'wind-rose':  return <WindRosePage profile={profile} />;
       case 'admin-stations': return isAdmin ? <AdminStations /> : <Dashboard profile={profile} />;
       case 'reports': return <Reports profile={profile} />;
       case 'alerts': return <Placeholder title="Alerts" desc="Coming in Phase 2." icon={Bell} />;
