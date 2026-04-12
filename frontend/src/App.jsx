@@ -10,6 +10,7 @@ import WindRosePage from './pages/WindRose';
 import AdminStations from './pages/AdminStations';
 import Reports from './pages/Reports';
 import DataTable from './pages/DataTable';
+import Alerts from './pages/Alerts';
 
 const NAV_CLIENT = [
   { id: 'dashboard',  label: 'Dashboard',  icon: LayoutDashboard },
@@ -119,7 +120,7 @@ export default function App() {
       case 'admin-stations': return isAdmin ? <AdminStations /> : <Dashboard profile={profile} />;
       case 'data':    return <DataTable profile={profile} />;
       case 'reports': return <Reports profile={profile} />;
-      case 'alerts': return <Placeholder title="Alerts" desc="Coming in Phase 2." icon={Bell} />;
+      case 'alerts': return <Alerts profile={profile} />;
       case 'settings': return <Placeholder title="Settings" desc="Coming in Phase 2." icon={Settings} />;
       case 'admin-clients': return <Placeholder title="Manage Clients" desc="Coming in Phase 2." icon={Users} />;
       case 'admin-settings': return <Placeholder title="System Settings" desc="Coming in Phase 2." icon={Shield} />;

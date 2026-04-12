@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from supabase import create_client
+from alerts import AlertEngine
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
@@ -20,6 +21,7 @@ AQICN_TOKEN  = os.getenv("AQICN_TOKEN", "")
 OWM_KEY      = os.getenv("OWM_API_KEY", "")
 
 sb = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL else None
+alert_engine = AlertEngine(sb) if sb else None
 
 # ─────────────────────────────────────────────────────────────────────────────
 # AQI calculation (US EPA PM2.5 breakpoints)
@@ -230,6 +232,9 @@ async def lifespan(app):
     pi = int(os.getenv("POLL_INTERVAL", "300"))
     asyncio.create_task(poll_all())
     scheduler.add_job(poll_all, "interval", seconds=pi)
+    if alert_engine:
+        scheduler.add_job(alert_engine.run, "interval", seconds=300, id="alert_check")
+        asyncio.create_task(asyncio.to_thread(alert_engine.run))
     scheduler.start()
     yield
     scheduler.shutdown()
@@ -265,6 +270,155 @@ async def ws_ep(ws: WebSocket):
             if d == "ping": await ws.send_json({"type": "pong"})
     except WebSocketDisconnect:
         mgr.disconnect(ws)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Alerts API
+# ─────────────────────────────────────────────────────────────────────────────
+
+class RuleUpdate(BaseModel):
+    enabled: Optional[bool] = None
+    warning_pct: Optional[int] = None
+    threshold: Optional[float] = None
+
+class RuleCreate(BaseModel):
+    station_id: Optional[str] = None
+    pollutant: str
+    period: str
+    threshold: float
+    warning_pct: int = 80
+
+class SubscriberCreate(BaseModel):
+    station_id: Optional[str] = None
+    email: str
+    name: Optional[str] = None
+    email_enabled: bool = True
+    role: str = "client"
+
+class EmailSettings(BaseModel):
+    provider: Optional[str] = None
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = None
+    smtp_user: Optional[str] = None
+    smtp_pass: Optional[str] = None
+    from_email: Optional[str] = None
+    resend_api_key: Optional[str] = None
+
+def require_sb():
+    if not sb: raise HTTPException(503, "Database not connected")
+
+@app.get("/api/alerts/active")
+def get_active_alerts(station_id: Optional[str] = None):
+    require_sb()
+    q = sb.table("alert_events").select("*, stations(name)").neq("status", "cleared").order("updated_at", desc=True)
+    if station_id: q = q.eq("station_id", station_id)
+    return q.execute().data or []
+
+@app.get("/api/alerts/history")
+def get_alert_history(station_id: Optional[str] = None, limit: int = 50, offset: int = 0):
+    require_sb()
+    q = (sb.table("alert_log")
+         .select("*, stations(name)")
+         .order("created_at", desc=True)
+         .limit(limit)
+         .offset(offset))
+    if station_id: q = q.eq("station_id", station_id)
+    return q.execute().data or []
+
+@app.get("/api/alerts/rules")
+def get_alert_rules(station_id: Optional[str] = None):
+    require_sb()
+    # Global rules
+    global_r = sb.table("alert_rules").select("*").is_("station_id", "null").execute().data or []
+    if station_id:
+        station_r = sb.table("alert_rules").select("*").eq("station_id", station_id).execute().data or []
+        overrides = {(r["pollutant"], r["period"]): r for r in station_r}
+        merged = {}
+        for r in global_r:
+            k = (r["pollutant"], r["period"])
+            merged[k] = overrides.get(k, r)
+        return list(merged.values()) + [r for r in station_r if r.get("is_custom")]
+    return global_r
+
+@app.put("/api/alerts/rules/{rule_id}")
+def update_alert_rule(rule_id: str, body: RuleUpdate):
+    require_sb()
+    updates = {k: v for k, v in body.dict().items() if v is not None}
+    if not updates: raise HTTPException(400, "No fields to update")
+    sb.table("alert_rules").update(updates).eq("id", rule_id).execute()
+    return {"ok": True}
+
+@app.post("/api/alerts/rules")
+def create_alert_rule(body: RuleCreate):
+    require_sb()
+    row = body.dict()
+    res = sb.table("alert_rules").insert({**row, "is_custom": True}).execute()
+    return res.data[0] if res.data else {}
+
+@app.delete("/api/alerts/rules/{rule_id}")
+def delete_alert_rule(rule_id: str):
+    require_sb()
+    sb.table("alert_rules").delete().eq("id", rule_id).execute()
+    return {"ok": True}
+
+@app.get("/api/alerts/subscribers")
+def get_alert_subscribers(station_id: Optional[str] = None):
+    require_sb()
+    q = sb.table("alert_subscribers").select("*, stations(name)").order("created_at")
+    if station_id: q = q.eq("station_id", station_id)
+    return q.execute().data or []
+
+@app.post("/api/alerts/subscribers")
+def create_subscriber(body: SubscriberCreate):
+    require_sb()
+    res = sb.table("alert_subscribers").insert(body.dict()).execute()
+    return res.data[0] if res.data else {}
+
+@app.delete("/api/alerts/subscribers/{sub_id}")
+def delete_subscriber(sub_id: str):
+    require_sb()
+    sb.table("alert_subscribers").delete().eq("id", sub_id).execute()
+    return {"ok": True}
+
+@app.post("/api/alerts/test")
+def send_test_alert(station_id: str):
+    require_sb()
+    station = sb.table("stations").select("id, name").eq("id", station_id).single().execute().data
+    if not station: raise HTTPException(404, "Station not found")
+    if not alert_engine: raise HTTPException(503, "Alert engine not initialized")
+    alert_engine.send_notification(
+        station_name=station["name"], station_id=station_id,
+        event_id=None, subject=f"🧪 AirWatch Test Alert — {station['name']}",
+        alerts_batch=[{"pollutant": "pm25", "period": "24-hour",
+                       "measured": 28.5, "threshold": 35,
+                       "status": "test", "tier": "test"}],
+        tier="test",
+    )
+    return {"ok": True, "message": f"Test notification queued for {station['name']}"}
+
+@app.get("/api/alerts/settings")
+def get_email_settings():
+    require_sb()
+    res = sb.table("system_settings").select("value").eq("key", "email_config").single().execute()
+    return res.data["value"] if res.data else {}
+
+@app.put("/api/alerts/settings")
+async def update_email_settings(body: dict):
+    require_sb()
+    from fastapi import Request
+    current = (sb.table("system_settings").select("value").eq("key", "email_config")
+               .single().execute().data or {}).get("value", {})
+    # Mask password in storage — store as-is for now (configure SMTP properly later)
+    merged = {**current, **body, "configured": bool(body.get("provider"))}
+    sb.table("system_settings").upsert({"key": "email_config", "value": merged}).execute()
+    return {"ok": True}
+
+@app.post("/api/alerts/run")
+def trigger_alert_check():
+    """Manually trigger an alert check (admin use)."""
+    if not alert_engine: raise HTTPException(503, "Alert engine not initialized")
+    import threading
+    threading.Thread(target=alert_engine.run, daemon=True).start()
+    return {"ok": True, "message": "Alert check started"}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Backfill endpoint
