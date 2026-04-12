@@ -397,26 +397,29 @@ function exportPDF(rows, readings, station, fromISO, toISO, generatedAt, activeC
 
   // ── Statistical Analysis table ────────────────────────────────────────────
   const statsY = doc.lastAutoTable.finalY + 10;
-  const statsCols = ['Parameter', 'Unit', 'N', 'Mean', 'Min', 'Max', 'Std Dev', 'P98'];
-  const statsBody = activeCols.map(c => {
+
+  // Per-column stats
+  const colStats = activeCols.map(c => {
     const vals = readings.map(r => r[c.key]).filter(v => v != null && !isNaN(Number(v))).map(Number);
-    if (!vals.length) return [c.pdfLabel, c.unit, '0', '—', '—', '—', '—', '—'];
+    if (!vals.length) return { c, mean: null, min: null, max: null, sd: null, p98v: null };
     const sorted = [...vals].sort((a, b) => a - b);
     const mean   = vals.reduce((a, b) => a + b, 0) / vals.length;
     const sd     = vals.length > 1
       ? Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length)
       : null;
     const p98idx = Math.ceil(0.98 * sorted.length) - 1;
-    const p98val = sorted[Math.max(0, Math.min(p98idx, sorted.length - 1))];
-    return [
-      c.pdfLabel, c.unit, String(vals.length),
-      mean.toFixed(c.dp),
-      sorted[0].toFixed(c.dp),
-      sorted[sorted.length - 1].toFixed(c.dp),
-      sd != null ? sd.toFixed(c.dp) : '—',
-      p98val.toFixed(c.dp),
-    ];
+    return { c, mean, min: sorted[0], max: sorted[sorted.length - 1], sd, p98v: sorted[Math.max(0, Math.min(p98idx, sorted.length - 1))] };
   });
+
+  // Rows = statistics, Columns = parameters
+  const statsHead = [['Statistic', ...activeCols.map(c => c.pdfLabel)]];
+  const statsBody = [
+    ['Mean',    ...colStats.map(({ c, mean })  => mean  != null ? mean.toFixed(c.dp)  : '—')],
+    ['Min',     ...colStats.map(({ c, min })   => min   != null ? min.toFixed(c.dp)   : '—')],
+    ['Max',     ...colStats.map(({ c, max })   => max   != null ? max.toFixed(c.dp)   : '—')],
+    ['Std Dev', ...colStats.map(({ c, sd })    => sd    != null ? sd.toFixed(c.dp)    : '—')],
+    ['P98',     ...colStats.map(({ c, p98v })  => p98v  != null ? p98v.toFixed(c.dp)  : '—')],
+  ];
 
   const needsNewPage = statsY + 50 > PH - 20;
   if (needsNewPage) doc.addPage();
@@ -427,15 +430,20 @@ function exportPDF(rows, readings, station, fromISO, toISO, generatedAt, activeC
   doc.setTextColor(...BLACK);
   doc.text('Statistical Analysis', ML, sY);
 
+  const statFirstColW = 18;
+  const statDataColW  = Math.max(10, Math.floor((CW - statFirstColW) / activeCols.length));
+  const statsColStyles = { 0: { cellWidth: statFirstColW, fontStyle: 'bold', halign: 'left' } };
+  activeCols.forEach((_, i) => { statsColStyles[i + 1] = { cellWidth: statDataColW, halign: 'right' }; });
+
   doc.autoTable({
-    head:      [statsCols],
+    head:      statsHead,
     body:      statsBody,
     startY:    sY + 4,
     margin:    { left: ML, right: MR, bottom: 14 },
     tableWidth: CW,
     styles:          { fontSize: 7, cellPadding: 2.2, textColor: [...BLACK] },
-    headStyles:      { fillColor: TEAL_RGB, textColor: [255,255,255], fontStyle: 'bold', fontSize: 7 },
-    columnStyles:    { 0: { fontStyle: 'bold' } },
+    headStyles:      { fillColor: TEAL_RGB, textColor: [255,255,255], fontStyle: 'bold', fontSize: 7, halign: 'center' },
+    columnStyles:    statsColStyles,
     alternateRowStyles: { fillColor: [240, 253, 250] },
   });
 
@@ -593,32 +601,45 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt, avgPeriod,
           Statistical Analysis
           <span style={{ fontSize: 10, fontWeight: 400, color: '#78716C' }}>(based on all raw readings)</span>
         </h3>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              {['Parameter', 'Unit', 'N', 'Mean', 'Min', 'Max', 'Std Dev', 'P98'].map(h => (
-                <th key={h} style={thStyle}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {activeCols.map((c, i) => {
-              const s = calcStats(readings, c.key);
-              return (
-                <tr key={c.key} style={{ background: i % 2 === 0 ? '#ffffff' : '#f9fafb' }}>
-                  <td style={{ padding: '7px 9px', fontSize: 12, fontWeight: 700, color: '#1C1917', fontFamily: 'Instrument Sans, sans-serif', borderBottom: '1px solid #f0f0f0' }}>{c.label}</td>
-                  <td style={{ padding: '7px 9px', fontSize: 12, color: '#57534E', fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0' }}>{c.unit}</td>
-                  <td style={{ padding: '7px 9px', fontSize: 12, fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0', color: '#1C1917' }}>{s.n || '—'}</td>
-                  <td style={{ padding: '7px 9px', fontSize: 12, fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0', color: '#1C1917' }}>{fmt(s.mean, c.dp)}</td>
-                  <td style={{ padding: '7px 9px', fontSize: 12, fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0', color: '#1C1917' }}>{fmt(s.min, c.dp)}</td>
-                  <td style={{ padding: '7px 9px', fontSize: 12, fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0', color: '#1C1917' }}>{fmt(s.max, c.dp)}</td>
-                  <td style={{ padding: '7px 9px', fontSize: 12, fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0', color: '#1C1917' }}>{fmt(s.sd, c.dp)}</td>
-                  <td style={{ padding: '7px 9px', fontSize: 12, fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0', color: '#1C1917' }}>{fmt(s.p98, c.dp)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        {(() => {
+          const statsPerCol = activeCols.map(c => ({ c, s: calcStats(readings, c.key) }));
+          const statRows = [
+            { label: 'Mean',    fn: ({ c, s }) => fmt(s.mean, c.dp) },
+            { label: 'Min',     fn: ({ c, s }) => fmt(s.min,  c.dp) },
+            { label: 'Max',     fn: ({ c, s }) => fmt(s.max,  c.dp) },
+            { label: 'Std Dev', fn: ({ c, s }) => fmt(s.sd,   c.dp) },
+            { label: 'P98',     fn: ({ c, s }) => fmt(s.p98,  c.dp) },
+          ];
+          return (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 400 }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...thStyle, minWidth: 72 }}>Statistic</th>
+                    {activeCols.map(c => (
+                      <th key={c.key} style={{ ...thStyle, textAlign: 'right', minWidth: 68 }}>
+                        {c.label}<br />
+                        <span style={{ fontSize: 9, fontWeight: 400, opacity: 0.85 }}>{c.unit}</span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {statRows.map((row, i) => (
+                    <tr key={row.label} style={{ background: i % 2 === 0 ? '#ffffff' : '#f9fafb' }}>
+                      <td style={{ padding: '7px 9px', fontSize: 12, fontWeight: 700, color: '#1C1917', fontFamily: 'Instrument Sans, sans-serif', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>{row.label}</td>
+                      {statsPerCol.map(({ c, s }) => (
+                        <td key={c.key} style={{ padding: '7px 9px', fontSize: 12, fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0', color: '#1C1917', textAlign: 'right' }}>
+                          {row.fn({ c, s })}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })()}
       </div>
 
       {/* ── 5. Footer ── */}
