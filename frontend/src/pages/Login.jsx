@@ -24,7 +24,7 @@ export default function Login({ onLogin }) {
     } finally { setLoading(false); }
   }
 
-  const inp = { width:'100%', padding:'13px 14px 13px 42px', borderRadius:14, border:'1px solid rgba(255,255,255,0.5)', background:'rgba(255,255,255,0.35)', backdropFilter:'blur(8px)', fontSize:14, color:'#1C1917', fontFamily:'var(--font)', outline:'none', transition:'border-color 0.2s, box-shadow 0.2s' };
+  const inp = { width:'100%', padding:'13px 14px 13px 42px', borderRadius:14, border:'1px solid rgba(255,255,255,0.5)', background:'rgba(255,255,255,0.35)', backdropFilter:'blur(8px)', fontSize:14, color:'var(--text)', fontFamily:'var(--font)', outline:'none', transition:'border-color 0.2s, box-shadow 0.2s' };
   const focus = e => { e.target.style.borderColor='rgba(16,163,74,0.4)'; e.target.style.boxShadow='0 0 0 3px rgba(16,163,74,0.08)'; };
   const blur = e => { e.target.style.borderColor='rgba(255,255,255,0.5)'; e.target.style.boxShadow='none'; };
 
@@ -46,8 +46,8 @@ export default function Login({ onLogin }) {
             <Wind size={26} color="#fff" />
           </div>
           <h1 style={{ fontSize:26, fontWeight:700, letterSpacing:'-0.03em', margin:'0 0 4px' }}>AirWatch<span style={{ color:'#16A34A' }}>.</span></h1>
-          <p style={{ fontSize:13, color:'#78716C', fontWeight:500 }}>Air Quality Monitoring Platform</p>
-          <p style={{ fontSize:11, color:'#A8A29E', marginTop:2 }}>Hills and Field Company Limited</p>
+          <p style={{ fontSize:13, color:'var(--text-muted)', fontWeight:500 }}>Air Quality Monitoring Platform</p>
+          <p style={{ fontSize:11, color:'var(--text-faint)', marginTop:2 }}>Hills and Field Company Limited</p>
         </div>
 
         {error && (
@@ -59,14 +59,14 @@ export default function Login({ onLogin }) {
 
         <div>
           <div style={{ marginBottom:18 }}>
-            <label htmlFor="email" style={{ display:'block', fontSize:12, fontWeight:600, color:'#57534E', marginBottom:6 }}>Email Address</label>
+            <label htmlFor="email" style={{ display:'block', fontSize:12, fontWeight:600, color:'var(--text-mid)', marginBottom:6 }}>Email Address</label>
             <div style={{ position:'relative' }}>
               <Mail size={16} color="#A8A29E" style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', pointerEvents:'none' }} />
               <input id="email" type="email" autoComplete="email" placeholder="you@company.com" value={email} onChange={e=>{setEmail(e.target.value);setError('')}} style={inp} onFocus={focus} onBlur={blur} />
             </div>
           </div>
           <div style={{ marginBottom:24 }}>
-            <label htmlFor="password" style={{ display:'block', fontSize:12, fontWeight:600, color:'#57534E', marginBottom:6 }}>Password</label>
+            <label htmlFor="password" style={{ display:'block', fontSize:12, fontWeight:600, color:'var(--text-mid)', marginBottom:6 }}>Password</label>
             <div style={{ position:'relative' }}>
               <Lock size={16} color="#A8A29E" style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', pointerEvents:'none' }} />
               <input id="password" type={showPass?'text':'password'} autoComplete="current-password" placeholder="Enter your password" value={password} onChange={e=>{setPassword(e.target.value);setError('')}} onKeyDown={e=>e.key==='Enter'&&handleSubmit(e)} style={{...inp,paddingRight:48}} onFocus={focus} onBlur={blur} />
@@ -82,11 +82,11 @@ export default function Login({ onLogin }) {
           </button>
         </div>
         <div style={{ textAlign:'center', marginTop:24 }}>
-          <p style={{ fontSize:11, color:'#A8A29E', lineHeight:1.5 }}>Login credentials provided by your administrator.<br/>Contact <span style={{ color:'#78716C', fontWeight:600 }}>support@hillsnfield.com</span></p>
+          <p style={{ fontSize:11, color:'var(--text-faint)', lineHeight:1.5 }}>Login credentials provided by your administrator.<br/>Contact <span style={{ color:'var(--text-muted)', fontWeight:600 }}>support@hillsnfield.com</span></p>
         </div>
       </div>
       <div style={{ position:'fixed', bottom:16, left:0, right:0, textAlign:'center', zIndex:1 }}>
-        <p style={{ fontSize:11, color:'#A8A29E', fontFamily:'var(--mono)' }}>AirWatch v2.1 — Hills and Field Company Limited</p>
+        <p style={{ fontSize:11, color:'var(--text-faint)', fontFamily:'var(--mono)' }}>AirWatch v2.1 — Hills and Field Company Limited</p>
       </div>
     </div>
   );

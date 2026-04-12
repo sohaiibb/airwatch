@@ -94,7 +94,7 @@ const GlassTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
     <div style={{ ...glass({ borderRadius: 10, padding: '8px 12px' }), boxShadow: '0 8px 24px rgba(0,0,0,0.1)' }}>
-      <p style={{ color: '#78716C', fontSize: 10, margin: '0 0 4px', fontFamily: 'DM Mono, monospace' }}>{label}</p>
+      <p style={{ color: 'var(--text-muted)', fontSize: 10, margin: '0 0 4px', fontFamily: 'DM Mono, monospace' }}>{label}</p>
       {payload.map((p, i) => (
         <p key={i} style={{ color: p.fill, fontSize: 11, margin: '1px 0', fontWeight: 600 }}>
           {p.name}: {p.value}
@@ -186,7 +186,7 @@ export default function Compliance({ profile }) {
 
   const inputStyle = {
     padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.5)',
-    background: 'rgba(255,255,255,0.35)', fontSize: 12, color: '#1C1917',
+    background: 'rgba(255,255,255,0.35)', fontSize: 12, color: 'var(--text)',
     fontFamily: 'var(--font)', outline: 'none', cursor: 'pointer',
   };
 
@@ -194,7 +194,7 @@ export default function Compliance({ profile }) {
     padding: '6px 14px', borderRadius: 9, border: 'none',
     background: active ? 'rgba(255,255,255,0.65)' : 'transparent',
     boxShadow: active ? '0 1px 4px rgba(0,0,0,0.06)' : 'none',
-    color: active ? '#1C1917' : '#78716C', fontWeight: active ? 700 : 500,
+    color: active ? 'var(--text)' : 'var(--text-muted)', fontWeight: active ? 700 : 500,
     fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all 0.2s',
   });
 
@@ -204,7 +204,7 @@ export default function Compliance({ profile }) {
       {/* Page header */}
       <div style={{ marginBottom: 24, animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) both' }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.02em' }}>Compliance</h1>
-        <p style={{ color: '#78716C', fontSize: 13, margin: 0 }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: 0 }}>
           NCEC air quality compliance per Royal Decree M/165 — Saudi Executive Regulation on Air Quality.
         </p>
       </div>
@@ -220,7 +220,7 @@ export default function Compliance({ profile }) {
       <div style={{ ...glass({ padding: '16px 20px', marginBottom: 16 }), display: 'flex', gap: 12, alignItems: isMobile ? 'stretch' : 'center', flexWrap: 'wrap', flexDirection: isMobile ? 'column' : 'row', animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.05s both' }}>
         {/* Station */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Station</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Station</span>
           <select value={selIdx} onChange={e => setSelIdx(Number(e.target.value))} style={inputStyle}>
             {stations.map((s, i) => <option key={s.id} value={i}>{s.name}</option>)}
           </select>
@@ -228,11 +228,11 @@ export default function Compliance({ profile }) {
 
         {/* Date range */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.05em' }}>From</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>From</span>
           <input type="date" value={from} max={to} onChange={e => setFrom(e.target.value)} style={inputStyle} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.05em' }}>To</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>To</span>
           <input type="date" value={to} min={from} max={today} onChange={e => setTo(e.target.value)} style={inputStyle} />
         </div>
 
@@ -241,7 +241,7 @@ export default function Compliance({ profile }) {
 
         {/* Period toggle */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Averaging Period</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Averaging Period</span>
           <div style={{ ...glassInner({ padding: '3px 4px', borderRadius: 11 }), display: 'flex', gap: 2 }}>
             {PERIODS.map(p => (
               <button key={p.id} onClick={() => setPeriod(p.id)} style={toggleBtn(period === p.id)}>{p.label}</button>
@@ -250,7 +250,7 @@ export default function Compliance({ profile }) {
         </div>
 
         {loading && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, color: '#78716C', fontSize: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, color: 'var(--text-muted)', fontSize: 12 }}>
             <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
             {loadingCount > 0 ? `Fetching… ${loadingCount.toLocaleString()} readings` : 'Loading…'}
           </div>
@@ -297,11 +297,11 @@ export default function Compliance({ profile }) {
           return (
             <div key={i} style={{ ...glass({ padding: '16px 18px', borderRadius: 16 }), animation: `glassIn 0.5s cubic-bezier(.16,1,.3,1) ${0.1 + i * 0.04}s both`, background: card.bg, border: `1px solid rgba(255,255,255,0.55)` }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{card.label}</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{card.label}</span>
                 <Icon size={15} color={card.color} />
               </div>
               <p style={{ fontSize: 22, fontWeight: 700, margin: '0 0 2px', fontFamily: 'DM Mono, monospace', color: card.color, lineHeight: 1 }}>{card.value}</p>
-              <p style={{ fontSize: 11, color: '#78716C', margin: 0 }}>{card.sub}</p>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>{card.sub}</p>
             </div>
           );
         })}
@@ -315,7 +315,7 @@ export default function Compliance({ profile }) {
         </h2>
 
         {compliance.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: '#A8A29E' }}>
+          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-faint)' }}>
             <Shield size={28} style={{ marginBottom: 8, opacity: 0.4 }} />
             <p style={{ fontSize: 13, margin: 0 }}>No applicable standards for the selected averaging period.</p>
             <p style={{ fontSize: 11, marginTop: 4 }}>Try selecting 1-Hour or 24-Hour.</p>
@@ -340,12 +340,12 @@ export default function Compliance({ profile }) {
                     <td style={{ padding: '10px 12px', borderBottom: '1px solid #F5F5F4', fontSize: 12, fontFamily: 'DM Mono, monospace' }}>{row.period}</td>
                     <td style={{ padding: '10px 12px', borderBottom: '1px solid #F5F5F4', fontSize: 12, fontFamily: 'DM Mono, monospace', fontWeight: 700 }}>{row.limit.toLocaleString()}</td>
                     <td style={{ padding: '10px 12px', borderBottom: '1px solid #F5F5F4', fontSize: 12, fontFamily: 'DM Mono, monospace' }}>{fmtN(row.avgVal)}</td>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid #F5F5F4', fontSize: 12, fontFamily: 'DM Mono, monospace', color: row.maxVal != null && row.maxVal > row.limit ? '#DC2626' : '#1C1917', fontWeight: row.maxVal != null && row.maxVal > row.limit ? 700 : 400 }}>{fmtN(row.maxVal)}</td>
+                    <td style={{ padding: '10px 12px', borderBottom: '1px solid #F5F5F4', fontSize: 12, fontFamily: 'DM Mono, monospace', color: row.maxVal != null && row.maxVal > row.limit ? '#DC2626' : 'var(--text)', fontWeight: row.maxVal != null && row.maxVal > row.limit ? 700 : 400 }}>{fmtN(row.maxVal)}</td>
                     <td style={{ padding: '10px 12px', borderBottom: '1px solid #F5F5F4', fontSize: 12, fontFamily: 'DM Mono, monospace', fontWeight: 700, color: row.exceedCount > 0 ? '#DC2626' : '#16A34A' }}>{row.dataPoints === 0 ? '—' : row.exceedCount}</td>
-                    <td style={{ padding: '10px 12px', borderBottom: '1px solid #F5F5F4', fontSize: 11, color: '#78716C' }}>{row.exceedances || '—'}</td>
+                    <td style={{ padding: '10px 12px', borderBottom: '1px solid #F5F5F4', fontSize: 11, color: 'var(--text-muted)' }}>{row.exceedances || '—'}</td>
                     <td style={{ padding: '10px 12px', borderBottom: '1px solid #F5F5F4' }}>
                       {row.dataPoints === 0
-                        ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#A8A29E', background: 'rgba(168,162,158,0.12)', padding: '3px 10px', borderRadius: 20 }}>No data</span>
+                        ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text-faint)', background: 'rgba(168,162,158,0.12)', padding: '3px 10px', borderRadius: 20 }}>No data</span>
                         : row.compliant
                           ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#16A34A', fontWeight: 700, background: 'rgba(22,163,74,0.12)', padding: '3px 10px', borderRadius: 20 }}><CheckCircle size={11} />Compliant</span>
                           : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#DC2626', fontWeight: 700, background: 'rgba(220,38,38,0.10)', padding: '3px 10px', borderRadius: 20 }}><XCircle size={11} />Exceeded</span>
@@ -364,14 +364,14 @@ export default function Compliance({ profile }) {
       {excHistory.length > 1 && (
         <div style={{ ...glass({ padding: '20px 24px', marginBottom: 16, borderRadius: 18 }), animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.25s both' }}>
           <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 4px' }}>Daily Exceedance History</h2>
-          <p style={{ color: '#A8A29E', fontSize: 11, margin: '0 0 16px' }}>
+          <p style={{ color: 'var(--text-faint)', fontSize: 11, margin: '0 0 16px' }}>
             Number of pollutants exceeding their 24-hour NCEC threshold per day
           </p>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={excHistory} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.04)" />
-              <XAxis dataKey="date" tick={{ fill: '#A8A29E', fontSize: 10, fontFamily: 'DM Mono, monospace' }} axisLine={false} tickLine={false} />
-              <YAxis allowDecimals={false} tick={{ fill: '#A8A29E', fontSize: 10, fontFamily: 'DM Mono, monospace' }} axisLine={false} tickLine={false} domain={[0, 6]} />
+              <XAxis dataKey="date" tick={{ fill: 'var(--text-faint)', fontSize: 10, fontFamily: 'DM Mono, monospace' }} axisLine={false} tickLine={false} />
+              <YAxis allowDecimals={false} tick={{ fill: 'var(--text-faint)', fontSize: 10, fontFamily: 'DM Mono, monospace' }} axisLine={false} tickLine={false} domain={[0, 6]} />
               <Tooltip content={<GlassTooltip />} />
               <ReferenceLine y={0} stroke="rgba(0,0,0,0.1)" />
               {Object.entries(NCEC_STANDARDS).map(([key, meta]) => (
@@ -383,7 +383,7 @@ export default function Compliance({ profile }) {
             {Object.entries(NCEC_STANDARDS).map(([key, meta]) => (
               <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <div style={{ width: 10, height: 10, borderRadius: 2, background: meta.color, flexShrink: 0 }} />
-                <span style={{ fontSize: 11, color: '#44403C' }}>{meta.label}</span>
+                <span style={{ fontSize: 11, color: 'var(--text-mid)' }}>{meta.label}</span>
               </div>
             ))}
           </div>
@@ -393,7 +393,7 @@ export default function Compliance({ profile }) {
       {/* Reference note */}
       <div style={{ ...glassInner({ padding: '12px 16px', borderRadius: 12, display: 'flex', gap: 10, alignItems: 'flex-start' }), animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.3s both' }}>
         <Info size={14} color="#78716C" style={{ flexShrink: 0, marginTop: 1 }} />
-        <p style={{ fontSize: 11, color: '#78716C', margin: 0, lineHeight: 1.6 }}>
+        <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0, lineHeight: 1.6 }}>
           <strong>Reference:</strong> NCEC Executive Regulation on Air Quality Standards, issued under Royal Decree M/165 (2019), Appendix 1.
           Standards are applied per their specified averaging period: 1-hour, 8-hour, 24-hour, or annual.
           Exceedances are counted against readings in the selected date range only and may not represent calendar-year compliance.

@@ -505,31 +505,31 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt, avgPeriod,
   });
 
   return (
-    <div id="aw-report" style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#1C1917', background: '#fff', maxWidth: 1080, margin: '0 auto' }}>
+    <div id="aw-report" style={{ fontFamily: 'Instrument Sans, sans-serif', color: 'var(--text)', background: '#fff', maxWidth: 1080, margin: '0 auto' }}>
 
       {/* ── 1. Header ── */}
       <div style={{ padding: isMobile ? '12px 0 10px' : '20px 0 14px', marginBottom: 16, borderBottom: `3px solid ${TEAL}` }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: isMobile ? 8 : 0 }}>
           <div style={{ flex: '1 1 200px' }}>
-            <h2 style={{ fontSize: isMobile ? 15 : 18, fontWeight: 700, margin: '0 0 5px', letterSpacing: '-0.01em', color: '#1C1917' }}>
+            <h2 style={{ fontSize: isMobile ? 15 : 18, fontWeight: 700, margin: '0 0 5px', letterSpacing: '-0.01em', color: 'var(--text)' }}>
               Air Quality Monitoring Report
             </h2>
-            <p style={{ fontSize: 12, color: '#57534E', margin: '0 0 2px' }}>Station: <strong>{station.name}</strong></p>
+            <p style={{ fontSize: 12, color: 'var(--text-mid)', margin: '0 0 2px' }}>Station: <strong>{station.name}</strong></p>
             {station.latitude != null && station.longitude != null && (
-              <p style={{ fontSize: 11, color: '#78716C', margin: '0 0 2px' }}>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '0 0 2px' }}>
                 Coordinates: {Number(station.latitude).toFixed(4)}°N, {Number(station.longitude).toFixed(4)}°E
               </p>
             )}
-            <p style={{ fontSize: 11, color: '#78716C', margin: 0 }}>
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>
               Period: {fmtDT(fromISO)} — {fmtDT(toISO)}
             </p>
           </div>
           <div style={{ textAlign: isMobile ? 'left' : 'right', flexShrink: 0, marginLeft: isMobile ? 0 : 24 }}>
-            <p style={{ fontSize: 10, color: '#78716C', margin: '0 0 2px' }}>Generated</p>
-            <p style={{ fontSize: 11, fontWeight: 600, color: '#1C1917', margin: 0, fontFamily: 'DM Mono, monospace' }}>
+            <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: '0 0 2px' }}>Generated</p>
+            <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)', margin: 0, fontFamily: 'DM Mono, monospace' }}>
               {fmtDT(generatedAt)}
             </p>
-            <p style={{ fontSize: 10, color: '#78716C', margin: '4px 0 0' }}>Hills and Field AirWatch</p>
+            <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: '4px 0 0' }}>Hills and Field AirWatch</p>
           </div>
         </div>
       </div>
@@ -543,8 +543,8 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt, avgPeriod,
           { label: 'Averaging',     value: avgPeriodLabel(avgPeriod) },
         ].map((s, i) => (
           <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <span style={{ fontSize: 11, color: '#57534E' }}>{s.label}:</span>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#1C1917', fontFamily: 'DM Mono, monospace' }}>{s.value}</span>
+            <span style={{ fontSize: 11, color: 'var(--text-mid)' }}>{s.label}:</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', fontFamily: 'DM Mono, monospace' }}>{s.value}</span>
             {i < 3 && <span style={{ color: '#D6D3D1', marginLeft: 10 }}>|</span>}
           </div>
         ))}
@@ -569,10 +569,10 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt, avgPeriod,
         );
         return (
           <div style={{ marginBottom: 24 }}>
-            <h3 style={{ fontSize: 12, fontWeight: 700, margin: '0 0 8px', color: '#1C1917', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <h3 style={{ fontSize: 12, fontWeight: 700, margin: '0 0 8px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ width: 4, height: 13, background: TEAL, borderRadius: 2, display: 'inline-block' }} />
               {avgPeriodTitle(avgPeriod)}
-              <span style={{ fontSize: 10, fontWeight: 400, color: '#78716C' }}>({tableRows.length} {avgPeriodUnit(avgPeriod)})</span>
+              <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-muted)' }}>({tableRows.length} {avgPeriodUnit(avgPeriod)})</span>
             </h3>
 
             <div className="pb" data-scroll-x style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', position: 'relative' }}>
@@ -593,7 +593,7 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt, avgPeriod,
                 <tbody>
                   {tableRows.length === 0 ? (
                     <tr>
-                      <td colSpan={activeCols.length + 1} style={{ ...tdStyle(0), textAlign: 'center', padding: '28px', color: '#A8A29E' }}>
+                      <td colSpan={activeCols.length + 1} style={{ ...tdStyle(0), textAlign: 'center', padding: '28px', color: 'var(--text-faint)' }}>
                         No data for this period
                       </td>
                     </tr>
@@ -615,8 +615,8 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt, avgPeriod,
               {/* Divider label */}
               <div style={{ padding: '5px 9px', background: TEAL_SOFT, borderTop: `2px solid ${TEAL}`, borderBottom: `1px solid ${TEAL_MID}`, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ width: 3, height: 10, background: TEAL, borderRadius: 2, display: 'inline-block' }} />
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#1C1917' }}>Statistical Analysis</span>
-                <span style={{ fontSize: 10, color: '#78716C' }}>(based on all raw readings)</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)' }}>Statistical Analysis</span>
+                <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>(based on all raw readings)</span>
               </div>
 
               {/* Stats table — same colgroup = perfectly aligned columns */}
@@ -636,9 +636,9 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt, avgPeriod,
                 <tbody>
                   {statRows.map((row, i) => (
                     <tr key={row.label} style={{ background: i % 2 === 0 ? '#ffffff' : '#f9fafb' }}>
-                      <td style={{ padding: '7px 9px', fontSize: 12, fontWeight: 700, color: '#1C1917', fontFamily: 'Instrument Sans, sans-serif', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>{row.label}</td>
+                      <td style={{ padding: '7px 9px', fontSize: 12, fontWeight: 700, color: 'var(--text)', fontFamily: 'Instrument Sans, sans-serif', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>{row.label}</td>
                       {statsPerCol.map(({ c, s }) => (
-                        <td key={c.key} style={{ padding: '7px 9px', fontSize: 12, fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0', color: '#1C1917', textAlign: 'right' }}>
+                        <td key={c.key} style={{ padding: '7px 9px', fontSize: 12, fontFamily: 'DM Mono, monospace', borderBottom: '1px solid #f0f0f0', color: 'var(--text)', textAlign: 'right' }}>
                           {row.fn({ c, s })}
                         </td>
                       ))}
@@ -654,14 +654,14 @@ function ReportView({ station, fromISO, toISO, readings, generatedAt, avgPeriod,
       {/* ── 5. Footer ── */}
       <div style={{ borderTop: `1px solid #e5e7eb`, paddingTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
         <div>
-          <p style={{ fontSize: 11, fontWeight: 700, color: '#1C1917', margin: '0 0 2px' }}>Hills and Field Company Limited</p>
-          <p style={{ fontSize: 10, color: '#78716C', margin: 0 }}>
+          <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', margin: '0 0 2px' }}>Hills and Field Company Limited</p>
+          <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: 0 }}>
             Report generated: {fmtDT(generatedAt)} · Hills and Field AirWatch Monitoring Dashboard
           </p>
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 20 }}>
-          <p style={{ fontSize: 10, color: '#57534E', margin: '0 0 1px' }}>Station: <strong>{station.name}</strong></p>
-          <p style={{ fontSize: 10, color: '#78716C', margin: 0 }}>Period: {fmtDateShort(fromISO)} – {fmtDateShort(toISO)}</p>
+          <p style={{ fontSize: 10, color: 'var(--text-mid)', margin: '0 0 1px' }}>Station: <strong>{station.name}</strong></p>
+          <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: 0 }}>Period: {fmtDateShort(fromISO)} – {fmtDateShort(toISO)}</p>
         </div>
       </div>
 
@@ -852,10 +852,10 @@ export default function Reports({ profile }) {
     width: '100%', padding: '8px 11px', borderRadius: 9,
     border: '1px solid rgba(255,255,255,0.5)',
     background: 'rgba(255,255,255,0.35)', backdropFilter: 'blur(8px)',
-    fontSize: 12, color: '#1C1917', fontFamily: 'var(--font)', outline: 'none',
+    fontSize: 12, color: 'var(--text)', fontFamily: 'var(--font)', outline: 'none',
   };
   const labelSt = {
-    fontSize: 10, fontWeight: 700, color: '#78716C',
+    fontSize: 10, fontWeight: 700, color: 'var(--text-muted)',
     letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5, display: 'block',
   };
   const actionBtn = (primary) => ({
@@ -865,7 +865,7 @@ export default function Reports({ profile }) {
     transition: 'opacity 0.2s',
     ...(primary
       ? { background: `linear-gradient(135deg, ${TEAL}, ${TEAL_DARK})`, color: '#fff', boxShadow: `0 2px 14px ${TEAL}40` }
-      : { background: 'rgba(255,255,255,0.45)', color: '#1C1917', border: '1px solid rgba(255,255,255,0.6)' }),
+      : { background: 'rgba(255,255,255,0.45)', color: 'var(--text)', border: '1px solid rgba(255,255,255,0.6)' }),
   });
   const pillBtn = (active) => ({
     padding: isMobile ? '8px 12px' : '4px 12px', borderRadius: 7,
@@ -873,7 +873,7 @@ export default function Reports({ profile }) {
     border: active ? `1px solid ${TEAL}` : '1px solid rgba(255,255,255,0.55)',
     background: active ? TEAL : 'rgba(255,255,255,0.38)',
     fontSize: 11, fontWeight: 600, cursor: 'pointer',
-    color: active ? '#fff' : '#44403C',
+    color: active ? '#fff' : 'var(--text-mid)',
     fontFamily: 'var(--font)', transition: 'all 0.15s',
   });
 
@@ -887,7 +887,7 @@ export default function Reports({ profile }) {
       {/* Page title */}
       <div style={{ marginBottom: 22, animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) both' }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 3px', letterSpacing: '-0.02em' }}>Reports</h1>
-        <p style={{ color: '#78716C', fontSize: 13, margin: 0 }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: 0 }}>
           Export monitoring data as PDF, CSV, or Excel for archiving and EIA reporting.
         </p>
       </div>
@@ -900,7 +900,7 @@ export default function Reports({ profile }) {
 
         {/* Presets */}
         <div style={{ display: 'flex', gap: 7, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: '#A8A29E', textTransform: 'uppercase', letterSpacing: '0.07em', minWidth: 56 }}>Presets:</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.07em', minWidth: 56 }}>Presets:</span>
           {PRESETS.map(p => {
             const isActive = selectedPreset === p.hours;
             return (
@@ -915,7 +915,7 @@ export default function Reports({ profile }) {
 
         {/* Averaging period */}
         <div style={{ display: 'flex', gap: 7, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: '#A8A29E', textTransform: 'uppercase', letterSpacing: '0.07em', minWidth: 56 }}>Averaging:</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.07em', minWidth: 56 }}>Averaging:</span>
           {AVG_PERIODS.map(p => {
             const isActive = avgPeriod === p.id;
             return (
@@ -931,13 +931,13 @@ export default function Reports({ profile }) {
         {/* Parameter selector */}
         <div style={{ marginBottom: 16, padding: '12px 14px', background: 'rgba(255,255,255,0.28)', border: '1px solid rgba(255,255,255,0.48)', borderRadius: 10 }}>
           <div style={{ display: 'flex', gap: 7, alignItems: 'center', marginBottom: 10 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, color: '#A8A29E', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Parameters:</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Parameters:</span>
           </div>
           <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', flexDirection: isMobile ? 'column' : 'row' }}>
             {PARAM_GROUPS.map(group => (
               <div key={group.label} style={{ flex: 1, minWidth: 200 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: '#57534E' }}>{group.label}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-mid)' }}>{group.label}</span>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button
                       onClick={() => setSelectedParams(prev => new Set([...prev, ...group.keys]))}
@@ -946,7 +946,7 @@ export default function Reports({ profile }) {
                     <span style={{ color: '#D6D3D1', fontSize: 10 }}>·</span>
                     <button
                       onClick={() => setSelectedParams(prev => { const next = new Set(prev); group.keys.forEach(k => next.delete(k)); return next; })}
-                      style={{ fontSize: 10, color: '#78716C', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'var(--font)', fontWeight: 600 }}
+                      style={{ fontSize: 10, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'var(--font)', fontWeight: 600 }}
                     >Deselect All</button>
                   </div>
                 </div>
@@ -955,7 +955,7 @@ export default function Reports({ profile }) {
                     const col     = COLS.find(c => c.key === key);
                     const checked = selectedParams.has(key);
                     return (
-                      <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 11, color: '#44403C', fontFamily: 'var(--font)', userSelect: 'none' }}>
+                      <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 11, color: 'var(--text-mid)', fontFamily: 'var(--font)', userSelect: 'none' }}>
                         <input
                           type="checkbox"
                           checked={checked}
@@ -1046,7 +1046,7 @@ export default function Reports({ profile }) {
                   <FileText size={14} color={TEAL} />
                   <div>
                     <p style={{ fontSize: 12, fontWeight: 600, margin: 0 }}>{r.stationName}</p>
-                    <p style={{ fontSize: 10, color: '#78716C', margin: '1px 0 0', fontFamily: 'DM Mono, monospace' }}>
+                    <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: '1px 0 0', fontFamily: 'DM Mono, monospace' }}>
                       {r.fromDT?.slice(0, 16).replace('T', ' ')} — {r.toDT?.slice(0, 16).replace('T', ' ')} · {r.readingCount} readings
                     </p>
                   </div>
@@ -1073,13 +1073,13 @@ export default function Reports({ profile }) {
         <div style={{ animation: 'glassIn 0.4s cubic-bezier(.16,1,.3,1) both' }}>
           {/* Preview toolbar (hidden on print) */}
           <div className="no-print" style={{ ...glass({ padding: '11px 18px', marginBottom: 14, borderRadius: 12 }), display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-            <p style={{ fontSize: 12, fontWeight: 600, margin: 0, color: '#57534E' }}>
+            <p style={{ fontSize: 12, fontWeight: 600, margin: 0, color: 'var(--text-mid)' }}>
               Preview — {report.station.name} · {report.readings.length} raw readings
             </p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button
                 onClick={() => { setReport(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                style={{ padding: '7px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#57534E', fontFamily: 'var(--font)' }}
+                style={{ padding: '7px 14px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: 'var(--text-mid)', fontFamily: 'var(--font)' }}
               >
                 ← Back
               </button>

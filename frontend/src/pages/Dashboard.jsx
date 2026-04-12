@@ -9,12 +9,54 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'rec
 import { getStations, getLatestReadings, getDemoStations, getDemoReadings, getDemoHistory } from '../lib/supabase';
 import { glass, glassInner, getAqiLevel, POLLUTANTS, formatTime } from '../lib/utils';
 
+// ─── Beaufort / compass helpers ───
+const BEAUFORT = [[0.2,'Calm'],[1.5,'Light Air'],[3.3,'Light Breeze'],[5.4,'Gentle Breeze'],[7.9,'Moderate Breeze'],[10.7,'Fresh Breeze'],[Infinity,'Strong']];
+function beaufort(v) { for (const [max, lbl] of BEAUFORT) if ((v || 0) <= max) return lbl; return 'Strong'; }
+function degToCard(d) { if (d == null) return '—'; const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW']; return dirs[Math.round(((d % 360) + 360) % 360 / 22.5) % 16]; }
+
+function WindCompassCard({ direction, speed, isMobile }) {
+  const size = isMobile ? 60 : 80;
+  const cx = size / 2, cy = size / 2, r = (size - 8) / 2;
+  return (
+    <div style={{ ...glass({ padding: '14px 16px' }), display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, animation: 'glassIn 0.6s cubic-bezier(.16,1,.3,1) 0.52s both' }}>
+      <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>Wind Dir</p>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ overflow: 'visible' }}>
+        <circle cx={cx} cy={cy} r={r} fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.3)" strokeWidth={1} />
+        {Array.from({ length: 8 }, (_, i) => {
+          const a = i * 45 * Math.PI / 180;
+          const len = i % 2 === 0 ? 6 : 3;
+          const ix = cx + Math.sin(a) * (r - len), iy = cy - Math.cos(a) * (r - len);
+          const ox = cx + Math.sin(a) * r, oy = cy - Math.cos(a) * r;
+          return <line key={i} x1={ix} y1={iy} x2={ox} y2={oy} stroke="rgba(255,255,255,0.5)" strokeWidth={i % 2 === 0 ? 1.5 : 0.8} />;
+        })}
+        {[['N', 0], ['E', 90], ['S', 180], ['W', 270]].map(([l, d]) => {
+          const a = d * Math.PI / 180, lr = r - 10;
+          const x = cx + Math.sin(a) * lr, y = cy - Math.cos(a) * lr;
+          return <text key={l} x={x} y={y} textAnchor="middle" dominantBaseline="middle" fontSize={size < 70 ? 7 : 8} fontWeight="700" fill="rgba(255,255,255,0.8)" fontFamily="var(--font)">{l}</text>;
+        })}
+        <g style={{ transform: `rotate(${direction || 0}deg)`, transformOrigin: `${cx}px ${cy}px`, transition: 'transform 0.8s cubic-bezier(0.34,1.56,0.64,1)' }}>
+          <polygon points={`${cx},${cy - r + 12} ${cx - 3},${cy + 6} ${cx + 3},${cy + 6}`} fill="#0d9488" fillOpacity={0.95} />
+          <polygon points={`${cx},${cy + r - 12} ${cx - 2},${cy - 6} ${cx + 2},${cy - 6}`} fill="rgba(255,255,255,0.3)" />
+        </g>
+        <circle cx={cx} cy={cy} r={3} fill="rgba(255,255,255,0.9)" />
+      </svg>
+      <div style={{ textAlign: 'center', lineHeight: 1.3 }}>
+        <p style={{ fontSize: size < 70 ? 13 : 15, fontWeight: 800, fontFamily: 'var(--mono)', color: 'var(--text)', margin: 0 }}>
+          {direction != null ? `${Math.round(direction)}°` : '—'} <span style={{ color: '#0d9488' }}>{degToCard(direction)}</span>
+        </p>
+        <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '2px 0 0' }}>{speed != null ? `${Number(speed).toFixed(1)} m/s` : '—'}</p>
+        <p style={{ fontSize: 10, color: 'var(--text-faint)', margin: 0 }}>{beaufort(speed)}</p>
+      </div>
+    </div>
+  );
+}
+
 // ─── Glass tooltip for charts ───
 const GlassTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
     <div style={{ ...glass({ borderRadius: 10, padding: '8px 12px' }), boxShadow: '0 8px 24px rgba(0,0,0,0.1)' }}>
-      <p style={{ color: '#78716C', fontSize: 10, margin: 0, marginBottom: 4, fontFamily: 'var(--font-mono)' }}>{label}</p>
+      <p style={{ color: 'var(--text-muted)', fontSize: 10, margin: 0, marginBottom: 4, fontFamily: 'var(--font-mono)' }}>{label}</p>
       {payload.map((p, i) => (
         <p key={i} style={{ color: p.color, fontSize: 12, margin: '1px 0', fontWeight: 600 }}>
           {p.name}: <span style={{ fontFamily: 'var(--font-mono)' }}>{p.value}</span>
@@ -45,9 +87,9 @@ function StatCard({ icon: Icon, label, value, unit, trend, trendVal, accent, del
           </span>
         )}
       </div>
-      <p style={{ color: '#78716C', fontSize: 10, fontWeight: 600, margin: 0, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{label}</p>
-      <p style={{ color: '#1C1917', fontSize: 24, fontWeight: 700, margin: '2px 0 0', fontFamily: 'var(--font-mono)', letterSpacing: '-0.03em' }}>
-        {value ?? '—'}<span style={{ fontSize: 11, color: '#A8A29E', marginLeft: 3, fontWeight: 500 }}>{unit}</span>
+      <p style={{ color: 'var(--text-muted)', fontSize: 10, fontWeight: 600, margin: 0, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{label}</p>
+      <p style={{ color: 'var(--text)', fontSize: 24, fontWeight: 700, margin: '2px 0 0', fontFamily: 'var(--font-mono)', letterSpacing: '-0.03em' }}>
+        {value ?? '—'}<span style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 3, fontWeight: 500 }}>{unit}</span>
       </p>
     </div>
   );
@@ -62,7 +104,7 @@ function PollutantBar({ name, value, max, unit, color, threshold }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
         <span style={{ color: '#44403C', fontSize: 12, fontWeight: 600 }}>{name}</span>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, color: over ? '#DC2626' : '#16A34A' }}>
-          {value ?? '—'} <span style={{ color: '#A8A29E', fontWeight: 400 }}>{unit}</span>
+          {value ?? '—'} <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>{unit}</span>
         </span>
       </div>
       <div style={{ background: 'rgba(255,255,255,0.45)', borderRadius: 6, height: 6, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.5)' }}>
@@ -85,7 +127,7 @@ function FitBounds({ stations }) {
 }
 
 // ═══ Dashboard Page ═══
-export default function Dashboard({ profile }) {
+export default function Dashboard({ profile, dark }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isPhone, setIsPhone] = useState(window.innerWidth < 480);
   useEffect(() => {
@@ -224,7 +266,7 @@ export default function Dashboard({ profile }) {
         {/* Map */}
         <div style={{ ...glass({ padding: 0, overflow: 'hidden' }), animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.05s both', height: isMobile ? 200 : 300 }}>
           <MapContainer center={[26.4, 50.0]} zoom={8} style={{ height: '100%', width: '100%' }} zoomControl={true} attributionControl={false}>
-            <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
+            <TileLayer url={dark ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"} />
             <FitBounds stations={stations} />
             {stations.map((s, i) => {
               const sr = readings[s.id] || {};
@@ -256,18 +298,18 @@ export default function Dashboard({ profile }) {
         {/* AQI Gauge */}
         <div style={{ ...glass({ padding: '24px 20px' }), display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.1s both', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', top: -30, right: -30, width: 90, height: 90, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,255,255,0.45), transparent 70%)', pointerEvents: 'none' }} />
-          <p style={{ color: '#78716C', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 14px', zIndex: 1 }}>Air Quality Index</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 14px', zIndex: 1 }}>Air Quality Index</p>
           <div style={{ width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.35)', border: `3px solid ${lvl.color}60`, backdropFilter: 'blur(16px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 1, animation: 'gaugeGlow 3s ease-in-out infinite', boxShadow: `0 0 40px ${lvl.color}15` }}>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 42, fontWeight: 500, color: lvl.color, lineHeight: 1 }}>{aqi || '—'}</span>
-            <span style={{ color: '#A8A29E', fontSize: 10, fontWeight: 500, marginTop: 2 }}>US AQI</span>
+            <span style={{ color: 'var(--text-faint)', fontSize: 10, fontWeight: 500, marginTop: 2 }}>US AQI</span>
           </div>
           <div style={{ marginTop: 12, padding: '4px 14px', borderRadius: 16, background: lvl.soft, border: `1px solid ${lvl.color}25`, display: 'flex', alignItems: 'center', gap: 4, zIndex: 1 }}>
             <CheckCircle size={12} color={lvl.color} />
             <span style={{ color: lvl.color, fontSize: 11, fontWeight: 700 }}>{lvl.label}</span>
           </div>
-          <p style={{ color: '#78716C', fontSize: 11, fontWeight: 600, marginTop: 8, zIndex: 1, textAlign: 'center' }}>{station.name || '—'}</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, marginTop: 8, zIndex: 1, textAlign: 'center' }}>{station.name || '—'}</p>
           {r.timestamp && (
-            <p style={{ color: '#A8A29E', fontSize: 9, fontFamily: 'var(--mono)', marginTop: 3, zIndex: 1, textAlign: 'center' }}>
+            <p style={{ color: 'var(--text-faint)', fontSize: 9, fontFamily: 'var(--mono)', marginTop: 3, zIndex: 1, textAlign: 'center' }}>
               {new Date(r.timestamp).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}
             </p>
           )}
@@ -298,13 +340,13 @@ export default function Dashboard({ profile }) {
               transition: 'all 0.2s',
             }}>
               <div style={{ width: 7, height: 7, borderRadius: '50%', background: sl.color, boxShadow: `0 0 6px ${sl.color}50` }} />
-              <span style={{ fontSize: 12, fontWeight: selIdx === i ? 700 : 500, color: selIdx === i ? '#1C1917' : '#78716C', whiteSpace: 'nowrap' }}>{s.name}</span>
+              <span style={{ fontSize: 12, fontWeight: selIdx === i ? 700 : 500, color: selIdx === i ? 'var(--text)' : 'var(--text-muted)', whiteSpace: 'nowrap' }}>{s.name}</span>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, color: sl.color }}>{sr.aqi || '—'}</span>
             </button>
           );
         })}
         {lastUpdated && !isDemo && (
-          <span style={{ marginLeft: 'auto', flexShrink: 0, fontSize: 10, color: '#A8A29E', fontFamily: 'var(--mono)', whiteSpace: 'nowrap', paddingLeft: 8 }}>
+          <span style={{ marginLeft: 'auto', flexShrink: 0, fontSize: 10, color: 'var(--text-faint)', fontFamily: 'var(--mono)', whiteSpace: 'nowrap', paddingLeft: 8 }}>
             Updated {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
           </span>
         )}
@@ -325,11 +367,11 @@ export default function Dashboard({ profile }) {
         <StatCard icon={Thermometer} label="Temperature" value={r.temperature} unit="°C" accent="#EF4444" delay={0.4} />
         <StatCard icon={Droplets} label="Humidity" value={r.humidity} unit="%" accent="#0EA5E9" delay={0.44} />
         <StatCard icon={Wind} label="Wind Speed" value={r.wind_speed} unit="m/s" accent="#8B5CF6" delay={0.48} />
-        <StatCard icon={Navigation} label="Wind Dir" value={r.wind_direction ? `${Math.round(r.wind_direction)}°` : null} unit="" accent="#F59E0B" delay={0.52} />
+        <WindCompassCard direction={r.wind_direction} speed={r.wind_speed} isMobile={isMobile} />
 
         {/* Mini sparkline */}
         <div style={{ ...glass({ padding: '14px 16px' }), animation: 'glassIn 0.6s cubic-bezier(.16,1,.3,1) 0.5s both' }}>
-          <p style={{ fontSize: 10, fontWeight: 700, color: '#78716C', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 6 }}>24H AQI TREND</p>
+          <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 6 }}>24H AQI TREND</p>
           <ResponsiveContainer width="100%" height={70}>
             <AreaChart data={spark} margin={{ top: 2, right: 4, left: -20, bottom: 0 }}>
               <defs>
@@ -352,12 +394,12 @@ export default function Dashboard({ profile }) {
         {/* Compliance summary */}
         <div style={{ ...glass({ padding: '20px 22px' }), animation: 'glassIn 0.6s cubic-bezier(.16,1,.3,1) 0.55s both', display: 'flex', flexDirection: 'column' }}>
           <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 3px' }}>Current Readings</h2>
-          <p style={{ color: '#A8A29E', fontSize: 11, margin: '0 0 14px' }}>Live pollutant levels vs. NCEC limits</p>
+          <p style={{ color: 'var(--text-faint)', fontSize: 11, margin: '0 0 14px' }}>Live pollutant levels vs. NCEC limits</p>
           {POLLUTANTS.map((p, i) => <PollutantBar key={i} name={p.name} value={r[p.key]} max={p.max} unit={p.unit} color={p.color} threshold={p.threshold} />)}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
             <div style={{ ...glassInner({ padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 6 }) }}>
               <Leaf size={12} color="#16A34A" />
-              <span style={{ color: '#78716C', fontSize: 10 }}>NCEC Royal Decree M/165</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>NCEC Royal Decree M/165</span>
             </div>
             {(() => {
               const over = POLLUTANTS.filter(p => r[p.key] != null && r[p.key] > p.threshold).length;
@@ -389,8 +431,8 @@ export default function Dashboard({ profile }) {
                 <item.icon size={14} color={item.color} />
               </div>
               <div>
-                <p style={{ color: '#1C1917', fontSize: 12, fontWeight: 650, margin: 0 }}>{item.title}</p>
-                <p style={{ color: '#78716C', fontSize: 11, margin: '2px 0 0', lineHeight: 1.4 }}>{item.desc}</p>
+                <p style={{ color: 'var(--text)', fontSize: 12, fontWeight: 650, margin: 0 }}>{item.title}</p>
+                <p style={{ color: 'var(--text-muted)', fontSize: 11, margin: '2px 0 0', lineHeight: 1.4 }}>{item.desc}</p>
               </div>
             </div>
           ))}

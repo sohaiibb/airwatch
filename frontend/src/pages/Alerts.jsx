@@ -75,7 +75,7 @@ function pctOf(val, limit) {
 function ActiveAlertCard({ event, stationName, isMobile }) {
   const meta = STATUS_META[event.status] || STATUS_META.triggered;
   const Icon = meta.icon;
-  const pm   = POLLUTANT_META[event.pollutant] || { label: event.pollutant, unit: '', color: '#78716C' };
+  const pm   = POLLUTANT_META[event.pollutant] || { label: event.pollutant, unit: '', color: 'var(--text-muted)' };
   const pct  = event.measured_value != null ? pctOf(event.measured_value, event.threshold) : null;
 
   return (
@@ -91,13 +91,13 @@ function ActiveAlertCard({ event, stationName, isMobile }) {
           <Icon size={18} color={meta.color} />
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: '#1C1917' }}>{pm.label}</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{pm.label}</span>
               <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: meta.color + '20', color: meta.color, fontWeight: 700 }}>
                 {meta.label}
               </span>
-              <span style={{ fontSize: 11, color: '#78716C' }}>{event.period}</span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{event.period}</span>
             </div>
-            <p style={{ fontSize: 11, color: '#57534E', margin: '3px 0 0' }}>
+            <p style={{ fontSize: 11, color: 'var(--text-mid)', margin: '3px 0 0' }}>
               {stationName} · Started {fmtDT(event.started_at)}
               {event.hour_count > 0 && ` · Hour ${event.hour_count}`}
             </p>
@@ -106,9 +106,9 @@ function ActiveAlertCard({ event, stationName, isMobile }) {
         <div style={{ textAlign: 'right' }}>
           <p style={{ fontFamily: 'DM Mono, monospace', fontSize: 20, fontWeight: 700, color: meta.color, margin: 0, lineHeight: 1 }}>
             {event.measured_value != null ? Number(event.measured_value).toFixed(1) : '—'}
-            <span style={{ fontSize: 11, color: '#A8A29E', fontWeight: 400, marginLeft: 3 }}>{pm.unit}</span>
+            <span style={{ fontSize: 11, color: 'var(--text-faint)', fontWeight: 400, marginLeft: 3 }}>{pm.unit}</span>
           </p>
-          <p style={{ fontSize: 10, color: '#78716C', margin: '2px 0 0' }}>
+          <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: '2px 0 0' }}>
             Limit: {event.threshold.toLocaleString()} {pm.unit}
             {pct != null && ` · ${pct}% of limit`}
           </p>
@@ -134,7 +134,7 @@ function ActiveAlertCard({ event, stationName, isMobile }) {
 }
 
 function HistoryRow({ item }) {
-  const meta = ACTION_META[item.action] || { label: item.action, color: '#78716C', icon: Activity };
+  const meta = ACTION_META[item.action] || { label: item.action, color: 'var(--text-muted)', icon: Activity };
   const Icon = meta.icon;
   const d = item.details || {};
   const stationName = item.stations?.name || '—';
@@ -147,16 +147,16 @@ function HistoryRow({ item }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
           <div>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#1C1917' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
               {d.tier ? `${d.tier.charAt(0).toUpperCase() + d.tier.slice(1)} — ` : ''}{meta.label}
             </span>
-            {d.subject && <p style={{ fontSize: 11, color: '#57534E', margin: '2px 0 0' }}>{d.subject}</p>}
+            {d.subject && <p style={{ fontSize: 11, color: 'var(--text-mid)', margin: '2px 0 0' }}>{d.subject}</p>}
             {d.alerts?.length > 0 && (
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
                 {d.alerts.map((a, i) => {
                   const pm = POLLUTANT_META[a.pollutant] || {};
                   return (
-                    <span key={i} style={{ fontSize: 10, padding: '1px 7px', borderRadius: 10, background: (pm.color || '#78716C') + '15', color: pm.color || '#78716C', fontFamily: 'DM Mono, monospace', fontWeight: 600 }}>
+                    <span key={i} style={{ fontSize: 10, padding: '1px 7px', borderRadius: 10, background: (pm.color || 'var(--text-muted)') + '15', color: pm.color || 'var(--text-muted)', fontFamily: 'DM Mono, monospace', fontWeight: 600 }}>
                       {pm.label || a.pollutant} {a.measured != null ? Number(a.measured).toFixed(1) : ''}
                     </span>
                   );
@@ -164,14 +164,14 @@ function HistoryRow({ item }) {
               </div>
             )}
             {d.from !== undefined && (
-              <p style={{ fontSize: 10, color: '#A8A29E', margin: '2px 0 0', fontFamily: 'DM Mono, monospace' }}>
+              <p style={{ fontSize: 10, color: 'var(--text-faint)', margin: '2px 0 0', fontFamily: 'DM Mono, monospace' }}>
                 {d.from ?? 'new'} → {d.to} · measured: {d.measured != null ? Number(d.measured).toFixed(1) : '—'}
               </p>
             )}
           </div>
           <div style={{ textAlign: 'right', flexShrink: 0 }}>
-            <p style={{ fontSize: 10, color: '#A8A29E', margin: 0, fontFamily: 'DM Mono, monospace', whiteSpace: 'nowrap' }}>{fmtDT(item.created_at)}</p>
-            <p style={{ fontSize: 10, color: '#78716C', margin: '2px 0 0' }}>{stationName}</p>
+            <p style={{ fontSize: 10, color: 'var(--text-faint)', margin: 0, fontFamily: 'DM Mono, monospace', whiteSpace: 'nowrap' }}>{fmtDT(item.created_at)}</p>
+            <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: '2px 0 0' }}>{stationName}</p>
           </div>
         </div>
       </div>
@@ -180,7 +180,7 @@ function HistoryRow({ item }) {
 }
 
 function RuleRow({ rule, onToggle, onWarnPctChange, isSaving }) {
-  const pm = POLLUTANT_META[rule.pollutant] || { label: rule.pollutant, unit: 'µg/m³', color: '#78716C' };
+  const pm = POLLUTANT_META[rule.pollutant] || { label: rule.pollutant, unit: 'µg/m³', color: 'var(--text-muted)' };
   const [localPct, setLocalPct] = useState(rule.warning_pct || 80);
 
   return (
@@ -191,8 +191,8 @@ function RuleRow({ rule, onToggle, onWarnPctChange, isSaving }) {
           {pm.label}
         </span>
       </td>
-      <td style={{ padding: '10px 12px', fontSize: 12, fontFamily: 'DM Mono, monospace', color: '#57534E' }}>{rule.period}</td>
-      <td style={{ padding: '10px 12px', fontSize: 12, fontFamily: 'DM Mono, monospace', fontWeight: 700, color: '#1C1917' }}>
+      <td style={{ padding: '10px 12px', fontSize: 12, fontFamily: 'DM Mono, monospace', color: 'var(--text-mid)' }}>{rule.period}</td>
+      <td style={{ padding: '10px 12px', fontSize: 12, fontFamily: 'DM Mono, monospace', fontWeight: 700, color: 'var(--text)' }}>
         {Number(rule.threshold).toLocaleString()} {pm.unit}
       </td>
       <td style={{ padding: '10px 12px' }}>
@@ -205,7 +205,7 @@ function RuleRow({ rule, onToggle, onWarnPctChange, isSaving }) {
             onTouchEnd={() => onWarnPctChange(rule.id, localPct)}
             style={{ width: 80, accentColor: TEAL }}
           />
-          <span style={{ fontSize: 11, fontFamily: 'DM Mono, monospace', color: '#57534E', minWidth: 30 }}>{localPct}%</span>
+          <span style={{ fontSize: 11, fontFamily: 'DM Mono, monospace', color: 'var(--text-mid)', minWidth: 30 }}>{localPct}%</span>
         </div>
       </td>
       <td style={{ padding: '10px 12px' }}>
@@ -223,7 +223,7 @@ function RuleRow({ rule, onToggle, onWarnPctChange, isSaving }) {
             ? <ToggleRight size={22} color={TEAL} />
             : <ToggleLeft size={22} color="#D6D3D1" />
           }
-          <span style={{ fontSize: 11, color: rule.enabled ? TEAL : '#A8A29E', fontWeight: 600 }}>
+          <span style={{ fontSize: 11, color: rule.enabled ? TEAL : 'var(--text-faint)', fontWeight: 600 }}>
             {rule.enabled ? 'On' : 'Off'}
           </span>
         </button>
@@ -472,14 +472,14 @@ export default function Alerts({ profile }) {
   // ── Shared styles ──────────────────────────────────────────────────────────
   const inp = {
     width: '100%', padding: '8px 11px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.5)',
-    background: 'rgba(255,255,255,0.35)', fontSize: 12, color: '#1C1917', fontFamily: 'var(--font)', outline: 'none',
+    background: 'rgba(255,255,255,0.35)', fontSize: 12, color: 'var(--text)', fontFamily: 'var(--font)', outline: 'none',
   };
   const tabBtn = (active) => ({
     padding: '8px 16px', borderRadius: 9, border: 'none', cursor: 'pointer',
     background: active ? 'rgba(255,255,255,0.65)' : 'transparent',
     boxShadow: active ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
     fontSize: 12, fontWeight: active ? 700 : 500,
-    color: active ? '#1C1917' : '#78716C',
+    color: active ? 'var(--text)' : 'var(--text-muted)',
     fontFamily: 'var(--font)', transition: 'all 0.2s',
     display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap',
   });
@@ -497,7 +497,7 @@ export default function Alerts({ profile }) {
       {/* Page header */}
       <div style={{ marginBottom: 20, animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) both' }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 3px', letterSpacing: '-0.02em' }}>Alerts</h1>
-        <p style={{ color: '#78716C', fontSize: 13, margin: 0 }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: 0 }}>
           NCEC exceedance detection, notifications, and subscriber management.
         </p>
       </div>
@@ -513,7 +513,7 @@ export default function Alerts({ profile }) {
       <div style={{ ...glass({ padding: '10px 14px', marginBottom: 16 }), display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.05s both' }}>
         {/* Station selector */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>Station</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>Station</span>
           <select value={selStation} onChange={e => setSelStation(e.target.value)} style={{ ...inp, width: 'auto', minWidth: 160 }}>
             {stations.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
@@ -545,7 +545,7 @@ export default function Alerts({ profile }) {
           {loadingActive ? (
             <div style={{ ...glass({ padding: '40px' }), textAlign: 'center' }}>
               <Loader2 size={24} color="#A8A29E" style={{ animation: 'spin 1s linear infinite', marginBottom: 8 }} />
-              <p style={{ color: '#78716C', fontSize: 13 }}>Loading alerts…</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Loading alerts…</p>
             </div>
           ) : activeAlerts.length === 0 ? (
             <div style={{ ...glass({ padding: '40px', background: 'rgba(22,163,74,0.07)', border: '1px solid rgba(22,163,74,0.2)' }), textAlign: 'center' }}>
@@ -580,7 +580,7 @@ export default function Alerts({ profile }) {
               { label: 'Check Interval',   value: '5 min',                                         color: TEAL },
             ].map((s, i) => (
               <div key={i} style={{ ...glass({ padding: '14px 16px' }), animation: `glassIn 0.5s cubic-bezier(.16,1,.3,1) ${0.1 + i * 0.04}s both` }}>
-                <p style={{ fontSize: 10, color: '#78716C', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>{s.label}</p>
+                <p style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>{s.label}</p>
                 <p style={{ fontSize: 22, fontWeight: 700, color: s.color, margin: 0, fontFamily: 'DM Mono, monospace' }}>{s.value}</p>
               </div>
             ))}
@@ -615,7 +615,7 @@ export default function Alerts({ profile }) {
               <Loader2 size={22} color="#A8A29E" style={{ animation: 'spin 1s linear infinite' }} />
             </div>
           ) : history.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: '#A8A29E' }}>
+            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-faint)' }}>
               <Clock size={28} style={{ marginBottom: 8, opacity: 0.4 }} />
               <p style={{ fontSize: 13, margin: 0 }}>No alert history for this station yet.</p>
               <p style={{ fontSize: 11, marginTop: 4 }}>Alerts will appear here once the backend starts monitoring.</p>
@@ -625,14 +625,14 @@ export default function Alerts({ profile }) {
               {histSlice.map(item => <HistoryRow key={item.id} item={item} />)}
               {histPages > 1 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14 }}>
-                  <span style={{ fontSize: 11, color: '#78716C' }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                     {histPage * HIST_PAGE + 1}–{Math.min((histPage + 1) * HIST_PAGE, history.length)} of {history.length}
                   </span>
                   <div style={{ display: 'flex', gap: 4 }}>
                     <button onClick={() => setHistPage(p => Math.max(0, p - 1))} disabled={histPage === 0}
-                      style={{ ...glassInner({ padding: '4px 10px', borderRadius: 7 }), border: 'none', cursor: 'pointer', fontSize: 11, color: histPage === 0 ? '#D6D3D1' : '#57534E' }}>← Prev</button>
+                      style={{ ...glassInner({ padding: '4px 10px', borderRadius: 7 }), border: 'none', cursor: 'pointer', fontSize: 11, color: histPage === 0 ? '#D6D3D1' : 'var(--text-mid)' }}>← Prev</button>
                     <button onClick={() => setHistPage(p => Math.min(histPages - 1, p + 1))} disabled={histPage >= histPages - 1}
-                      style={{ ...glassInner({ padding: '4px 10px', borderRadius: 7 }), border: 'none', cursor: 'pointer', fontSize: 11, color: histPage >= histPages - 1 ? '#D6D3D1' : '#57534E' }}>Next →</button>
+                      style={{ ...glassInner({ padding: '4px 10px', borderRadius: 7 }), border: 'none', cursor: 'pointer', fontSize: 11, color: histPage >= histPages - 1 ? '#D6D3D1' : 'var(--text-mid)' }}>Next →</button>
                   </div>
                 </div>
               )}
@@ -652,7 +652,7 @@ export default function Alerts({ profile }) {
                 <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 2px', display: 'flex', alignItems: 'center', gap: 7 }}>
                   <Shield size={14} color={TEAL} /> NCEC Alert Rules
                 </h2>
-                <p style={{ color: '#A8A29E', fontSize: 11, margin: 0 }}>Toggle detection on/off and adjust warning thresholds</p>
+                <p style={{ color: 'var(--text-faint)', fontSize: 11, margin: 0 }}>Toggle detection on/off and adjust warning thresholds</p>
               </div>
               <button onClick={() => setShowCustomForm(p => !p)} style={{
                 ...glassInner({ padding: '7px 13px', borderRadius: 10 }),
@@ -671,7 +671,7 @@ export default function Alerts({ profile }) {
                   <thead>
                     <tr>
                       {['Pollutant', 'Period', 'NCEC Limit', 'Warning At', 'Type', 'Enabled'].map(h => (
-                        <th key={h} style={{ padding: '8px 12px', fontSize: 10, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'left', borderBottom: '1px solid rgba(0,0,0,0.07)', whiteSpace: 'nowrap' }}>{h}</th>
+                        <th key={h} style={{ padding: '8px 12px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'left', borderBottom: '1px solid rgba(0,0,0,0.07)', whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -689,26 +689,26 @@ export default function Alerts({ profile }) {
             {/* Custom rule form */}
             {showCustomForm && (
               <div style={{ marginTop: 16, padding: '14px 16px', background: 'rgba(13,148,136,0.05)', border: `1px solid ${TEAL}30`, borderRadius: 12 }}>
-                <p style={{ fontSize: 12, fontWeight: 700, color: '#1C1917', margin: '0 0 12px' }}>New Custom Rule</p>
+                <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', margin: '0 0 12px' }}>New Custom Rule</p>
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr) auto', gap: 10, alignItems: 'flex-end' }}>
                   <div>
-                    <label style={{ fontSize: 10, fontWeight: 700, color: '#78716C', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pollutant</label>
+                    <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pollutant</label>
                     <select value={customRule.pollutant} onChange={e => setCustomRule(p => ({ ...p, pollutant: e.target.value }))} style={inp}>
                       {Object.entries(POLLUTANT_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label style={{ fontSize: 10, fontWeight: 700, color: '#78716C', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Period</label>
+                    <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Period</label>
                     <select value={customRule.period} onChange={e => setCustomRule(p => ({ ...p, period: e.target.value }))} style={inp}>
                       {['1-hour', '8-hour', '24-hour'].map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label style={{ fontSize: 10, fontWeight: 700, color: '#78716C', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Threshold</label>
+                    <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Threshold</label>
                     <input type="number" value={customRule.threshold} onChange={e => setCustomRule(p => ({ ...p, threshold: e.target.value }))} placeholder="e.g. 50" style={inp} />
                   </div>
                   <div>
-                    <label style={{ fontSize: 10, fontWeight: 700, color: '#78716C', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Warn at %</label>
+                    <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Warn at %</label>
                     <input type="number" min={50} max={95} value={customRule.warning_pct} onChange={e => setCustomRule(p => ({ ...p, warning_pct: Number(e.target.value) }))} style={inp} />
                   </div>
                   <button onClick={addCustomRule} disabled={savingCustom || !customRule.threshold}
@@ -727,7 +727,7 @@ export default function Alerts({ profile }) {
                 <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 2px', display: 'flex', alignItems: 'center', gap: 7 }}>
                   <Mail size={14} color={TEAL} /> Email Configuration
                 </h2>
-                <p style={{ color: '#A8A29E', fontSize: 11, margin: 0 }}>Configure SMTP or Resend to deliver alert notifications</p>
+                <p style={{ color: 'var(--text-faint)', fontSize: 11, margin: 0 }}>Configure SMTP or Resend to deliver alert notifications</p>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: emailConfig.configured ? 'rgba(22,163,74,0.1)' : 'rgba(234,179,8,0.1)', border: `1px solid ${emailConfig.configured ? 'rgba(22,163,74,0.25)' : 'rgba(234,179,8,0.25)'}` }}>
                 <div style={{ width: 7, height: 7, borderRadius: '50%', background: emailConfig.configured ? '#16A34A' : '#CA8A04' }} />
@@ -738,7 +738,7 @@ export default function Alerts({ profile }) {
             </div>
 
             <div style={{ marginBottom: 14 }}>
-              <label style={{ fontSize: 10, fontWeight: 700, color: '#78716C', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Provider</label>
+              <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Provider</label>
               <select
                 value={emailFields.provider || 'none'}
                 onChange={e => setEmailFields(p => ({ ...p, provider: e.target.value === 'none' ? null : e.target.value }))}
@@ -760,7 +760,7 @@ export default function Alerts({ profile }) {
                   { key: 'from_email', label: 'From Email', placeholder: 'alerts@hfcl.sa' },
                 ].map(f => (
                   <div key={f.key}>
-                    <label style={{ fontSize: 10, fontWeight: 700, color: '#78716C', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{f.label}</label>
+                    <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{f.label}</label>
                     <input type={f.type || 'text'} value={emailFields[f.key] || ''} onChange={e => setEmailFields(p => ({ ...p, [f.key]: e.target.value }))} placeholder={f.placeholder} style={inp} />
                   </div>
                 ))}
@@ -770,11 +770,11 @@ export default function Alerts({ profile }) {
             {emailFields.provider === 'resend' && (
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 14 }}>
                 <div>
-                  <label style={{ fontSize: 10, fontWeight: 700, color: '#78716C', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Resend API Key</label>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Resend API Key</label>
                   <input type="password" value={emailFields.resend_api_key || ''} onChange={e => setEmailFields(p => ({ ...p, resend_api_key: e.target.value }))} placeholder="re_••••••••" style={inp} />
                 </div>
                 <div>
-                  <label style={{ fontSize: 10, fontWeight: 700, color: '#78716C', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>From Email</label>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>From Email</label>
                   <input type="text" value={emailFields.from_email || ''} onChange={e => setEmailFields(p => ({ ...p, from_email: e.target.value }))} placeholder="alerts@hfcl.sa" style={inp} />
                 </div>
               </div>
@@ -794,7 +794,7 @@ export default function Alerts({ profile }) {
               <button onClick={sendTestAlert} disabled={testingAlert || !emailConfig.configured} style={{
                 padding: '8px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.5)',
                 cursor: emailConfig.configured ? 'pointer' : 'not-allowed',
-                background: 'rgba(255,255,255,0.4)', color: emailConfig.configured ? '#1C1917' : '#A8A29E',
+                background: 'rgba(255,255,255,0.4)', color: emailConfig.configured ? 'var(--text)' : 'var(--text-faint)',
                 fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)',
                 display: 'flex', alignItems: 'center', gap: 5, opacity: emailConfig.configured ? 1 : 0.5,
               }}>
@@ -811,7 +811,7 @@ export default function Alerts({ profile }) {
             {!emailConfig.configured && (
               <div style={{ marginTop: 14, display: 'flex', gap: 8, padding: '10px 12px', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 10 }}>
                 <Info size={14} color="#3B82F6" style={{ flexShrink: 0, marginTop: 1 }} />
-                <p style={{ fontSize: 11, color: '#57534E', margin: 0, lineHeight: 1.6 }}>
+                <p style={{ fontSize: 11, color: 'var(--text-mid)', margin: 0, lineHeight: 1.6 }}>
                   Alert detection, state tracking, and logging are fully active without email.
                   Configure a provider above to receive email notifications.
                   All alerts are logged to the History tab regardless of email status.
@@ -834,15 +834,15 @@ export default function Alerts({ profile }) {
             <form onSubmit={addSubscriber}>
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr auto', gap: 12, alignItems: 'flex-end' }}>
                 <div>
-                  <label style={{ fontSize: 10, fontWeight: 700, color: '#78716C', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email *</label>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email *</label>
                   <input type="email" value={newSub.email} onChange={e => setNewSub(p => ({ ...p, email: e.target.value }))} placeholder="name@company.com" required style={inp} />
                 </div>
                 <div>
-                  <label style={{ fontSize: 10, fontWeight: 700, color: '#78716C', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Name</label>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Name</label>
                   <input type="text" value={newSub.name} onChange={e => setNewSub(p => ({ ...p, name: e.target.value }))} placeholder="Contact name" style={inp} />
                 </div>
                 <div>
-                  <label style={{ fontSize: 10, fontWeight: 700, color: '#78716C', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Station (optional)</label>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Station (optional)</label>
                   <select value={newSub.station_id} onChange={e => setNewSub(p => ({ ...p, station_id: e.target.value }))} style={inp}>
                     <option value="">All stations</option>
                     {stations.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -866,13 +866,13 @@ export default function Alerts({ profile }) {
           <div style={{ ...glass({ padding: '20px 22px' }) }}>
             <h2 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 14px', display: 'flex', alignItems: 'center', gap: 7 }}>
               <Users size={14} color={TEAL} /> Active Subscribers
-              <span style={{ fontSize: 11, fontWeight: 400, color: '#A8A29E' }}>({subscribers.length})</span>
+              <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-faint)' }}>({subscribers.length})</span>
             </h2>
 
             {loadingSubs ? (
               <div style={{ textAlign: 'center', padding: '24px 0' }}><Loader2 size={20} color="#A8A29E" style={{ animation: 'spin 1s linear infinite' }} /></div>
             ) : subscribers.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '32px 0', color: '#A8A29E' }}>
+              <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-faint)' }}>
                 <Users size={28} style={{ marginBottom: 8, opacity: 0.4 }} />
                 <p style={{ fontSize: 13, margin: 0 }}>No subscribers yet.</p>
                 <p style={{ fontSize: 11, marginTop: 4 }}>Add an email address above to receive alert notifications.</p>
@@ -886,8 +886,8 @@ export default function Alerts({ profile }) {
                         <Mail size={14} color={TEAL} />
                       </div>
                       <div>
-                        <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: '#1C1917' }}>{sub.name || sub.email}</p>
-                        <p style={{ fontSize: 11, color: '#78716C', margin: '1px 0 0' }}>
+                        <p style={{ fontSize: 13, fontWeight: 600, margin: 0, color: 'var(--text)' }}>{sub.name || sub.email}</p>
+                        <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '1px 0 0' }}>
                           {sub.name ? sub.email + ' · ' : ''}
                           {sub.stations?.name || 'All stations'} · {sub.role}
                         </p>
@@ -900,13 +900,13 @@ export default function Alerts({ profile }) {
                           ? <ToggleRight size={20} color={TEAL} />
                           : <ToggleLeft size={20} color="#D6D3D1" />
                         }
-                        <span style={{ fontSize: 11, color: sub.email_enabled ? TEAL : '#A8A29E', fontWeight: 600 }}>Email</span>
+                        <span style={{ fontSize: 11, color: sub.email_enabled ? TEAL : 'var(--text-faint)', fontWeight: 600 }}>Email</span>
                       </button>
                       <button onClick={() => toggleSubscriberEmail(sub.id, sub.email_enabled)}
                         title="WhatsApp — coming soon"
                         style={{ background: 'none', border: 'none', cursor: 'not-allowed', display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0', opacity: 0.4 }}>
                         <ToggleLeft size={20} color="#D6D3D1" />
-                        <span style={{ fontSize: 11, color: '#A8A29E', fontWeight: 600 }}>WhatsApp</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-faint)', fontWeight: 600 }}>WhatsApp</span>
                       </button>
                       <button onClick={() => removeSubscriber(sub.id)}
                         style={{ ...glassInner({ padding: '5px 9px', borderRadius: 8 }), border: '1px solid rgba(220,38,38,0.15)', background: 'rgba(220,38,38,0.06)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#DC2626', fontFamily: 'var(--font)', fontWeight: 600 }}>

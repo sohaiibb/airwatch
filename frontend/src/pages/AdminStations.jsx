@@ -37,19 +37,19 @@ export default function AdminStations() {
 
   async function handleDelete(id){if(!confirm('Delete this station?'))return;try{await supabase.from('stations').delete().eq('id',id);await load();setEditing(null);}catch(e){setMsg(`Error: ${e.message}`);}}
 
-  const inp={width:'100%',padding:'10px 12px',borderRadius:10,border:'1px solid rgba(255,255,255,0.5)',background:'rgba(255,255,255,0.35)',fontSize:13,color:'#1C1917',fontFamily:'var(--font)',outline:'none'};
+  const inp={width:'100%',padding:'10px 12px',borderRadius:10,border:'1px solid rgba(255,255,255,0.5)',background:'rgba(255,255,255,0.35)',fontSize:13,color:'var(--text)',fontFamily:'var(--font)',outline:'none'};
 
   return (
     <div>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
-        <div><h2 style={{fontSize:20,fontWeight:700}}>Manage Stations</h2><p style={{fontSize:12,color:'#78716C'}}>{stations.length} stations</p></div>
+        <div><h2 style={{fontSize:20,fontWeight:700}}>Manage Stations</h2><p style={{fontSize:12,color:'var(--text-muted)'}}>{stations.length} stations</p></div>
         <button onClick={()=>{setEditing({...EMPTY,_isNew:true});setMsg('');}} style={{...glassInner({padding:'8px 16px',borderRadius:12}),display:'flex',alignItems:'center',gap:6,border:'none',cursor:'pointer',fontSize:13,fontWeight:600,color:'#16A34A',fontFamily:'var(--font)'}}><Plus size={16}/>Add Station</button>
       </div>
 
       <div style={{display:'grid',gridTemplateColumns:editing && !isMobile ?'1fr 1fr':'1fr',gap:16}}>
         <div style={{...glass({padding:'16px'}),animation:'glassIn 0.5s ease both'}}>
           {loading?<div style={{textAlign:'center',padding:40}}><Loader2 size={24} color="#A8A29E" style={{animation:'spin 1s linear infinite'}}/></div>
-          :stations.length===0?<div style={{textAlign:'center',padding:40,color:'#A8A29E'}}><Radio size={32} style={{marginBottom:8,opacity:.4}}/><p style={{fontWeight:600}}>No stations yet</p></div>
+          :stations.length===0?<div style={{textAlign:'center',padding:40,color:'var(--text-faint)'}}><Radio size={32} style={{marginBottom:8,opacity:.4}}/><p style={{fontWeight:600}}>No stations yet</p></div>
           :<div style={{display:'flex',flexDirection:'column',gap:6}}>
             {stations.map(s=>(
               <button key={s.id} onClick={()=>{setEditing({...s,field_mapping:s.field_mapping||EMPTY.field_mapping,_isNew:false});setMsg('');}} style={{
@@ -59,8 +59,8 @@ export default function AdminStations() {
                 cursor:'pointer',fontFamily:'var(--font)',textAlign:'left',width:'100%',transition:'all 0.2s',
               }}>
                 <div style={{display:'flex',alignItems:'center',gap:10}}>
-                  <div style={{width:8,height:8,borderRadius:'50%',background:s.status==='online'?'#16A34A':s.status==='stale'?'#CA8A04':'#A8A29E'}}/>
-                  <div><p style={{fontSize:13,fontWeight:600}}>{s.name}</p><p style={{fontSize:10,color:'#A8A29E',fontFamily:'var(--mono)'}}>{s.device_id||'No device'} — {s.data_protocol?.toUpperCase()}</p></div>
+                  <div style={{width:8,height:8,borderRadius:'50%',background:s.status==='online'?'#16A34A':s.status==='stale'?'#CA8A04':'var(--text-faint)'}}/>
+                  <div><p style={{fontSize:13,fontWeight:600}}>{s.name}</p><p style={{fontSize:10,color:'var(--text-faint)',fontFamily:'var(--mono)'}}>{s.device_id||'No device'} — {s.data_protocol?.toUpperCase()}</p></div>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:6}}>
                   {s.status==='online'?<Wifi size={12} color="#16A34A"/>:<WifiOff size={12} color="#A8A29E"/>}
@@ -77,26 +77,26 @@ export default function AdminStations() {
             <h3 style={{fontSize:15,fontWeight:700,marginBottom:16}}>{editing._isNew?'New Station':`Edit: ${editing.name}`}</h3>
             {msg&&<div style={{padding:'8px 12px',borderRadius:10,marginBottom:14,fontSize:12,fontWeight:600,background:msg.includes('Error')?'rgba(220,38,38,0.08)':'rgba(22,163,74,0.08)',color:msg.includes('Error')?'#DC2626':'#16A34A',border:`1px solid ${msg.includes('Error')?'rgba(220,38,38,0.2)':'rgba(22,163,74,0.2)'}`}}>{msg}</div>}
 
-            <p style={{fontSize:11,fontWeight:700,color:'#78716C',marginBottom:8,textTransform:'uppercase',letterSpacing:'0.06em'}}>Basic Info</p>
+            <p style={{fontSize:11,fontWeight:700,color:'var(--text-muted)',marginBottom:8,textTransform:'uppercase',letterSpacing:'0.06em'}}>Basic Info</p>
             <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:10,marginBottom:16}}>
-              <div><label style={{fontSize:11,fontWeight:600,color:'#57534E',display:'block',marginBottom:4}}>Station Name *</label><input value={editing.name} onChange={e=>setEditing({...editing,name:e.target.value})} placeholder="Al Khobar Central" style={inp}/></div>
-              <div><label style={{fontSize:11,fontWeight:600,color:'#57534E',display:'block',marginBottom:4}}>Device ID</label><input value={editing.device_id} onChange={e=>setEditing({...editing,device_id:e.target.value})} placeholder="ENE04771" style={inp}/></div>
-              <div><label style={{fontSize:11,fontWeight:600,color:'#57534E',display:'block',marginBottom:4}}>Latitude *</label><input value={editing.latitude} onChange={e=>setEditing({...editing,latitude:e.target.value})} placeholder="26.2956" style={inp} type="number" step="0.0001"/></div>
-              <div><label style={{fontSize:11,fontWeight:600,color:'#57534E',display:'block',marginBottom:4}}>Longitude *</label><input value={editing.longitude} onChange={e=>setEditing({...editing,longitude:e.target.value})} placeholder="50.2123" style={inp} type="number" step="0.0001"/></div>
+              <div><label style={{fontSize:11,fontWeight:600,color:'var(--text-mid)',display:'block',marginBottom:4}}>Station Name *</label><input value={editing.name} onChange={e=>setEditing({...editing,name:e.target.value})} placeholder="Al Khobar Central" style={inp}/></div>
+              <div><label style={{fontSize:11,fontWeight:600,color:'var(--text-mid)',display:'block',marginBottom:4}}>Device ID</label><input value={editing.device_id} onChange={e=>setEditing({...editing,device_id:e.target.value})} placeholder="ENE04771" style={inp}/></div>
+              <div><label style={{fontSize:11,fontWeight:600,color:'var(--text-mid)',display:'block',marginBottom:4}}>Latitude *</label><input value={editing.latitude} onChange={e=>setEditing({...editing,latitude:e.target.value})} placeholder="26.2956" style={inp} type="number" step="0.0001"/></div>
+              <div><label style={{fontSize:11,fontWeight:600,color:'var(--text-mid)',display:'block',marginBottom:4}}>Longitude *</label><input value={editing.longitude} onChange={e=>setEditing({...editing,longitude:e.target.value})} placeholder="50.2123" style={inp} type="number" step="0.0001"/></div>
             </div>
 
-            <p style={{fontSize:11,fontWeight:700,color:'#78716C',marginBottom:8,textTransform:'uppercase',letterSpacing:'0.06em'}}>Data Source</p>
+            <p style={{fontSize:11,fontWeight:700,color:'var(--text-muted)',marginBottom:8,textTransform:'uppercase',letterSpacing:'0.06em'}}>Data Source</p>
             <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:10,marginBottom:10}}>
-              <div><label style={{fontSize:11,fontWeight:600,color:'#57534E',display:'block',marginBottom:4}}>API Base URL</label><input value={editing.api_base_url} onChange={e=>setEditing({...editing,api_base_url:e.target.value})} placeholder="https://apis.enggenv.com/api/v1/uz/data" style={inp}/></div>
-              <div><label style={{fontSize:11,fontWeight:600,color:'#57534E',display:'block',marginBottom:4}}>Polling (sec)</label><input value={editing.polling_interval_seconds} onChange={e=>setEditing({...editing,polling_interval_seconds:e.target.value})} style={inp} type="number"/></div>
+              <div><label style={{fontSize:11,fontWeight:600,color:'var(--text-mid)',display:'block',marginBottom:4}}>API Base URL</label><input value={editing.api_base_url} onChange={e=>setEditing({...editing,api_base_url:e.target.value})} placeholder="https://apis.enggenv.com/api/v1/uz/data" style={inp}/></div>
+              <div><label style={{fontSize:11,fontWeight:600,color:'var(--text-mid)',display:'block',marginBottom:4}}>Polling (sec)</label><input value={editing.polling_interval_seconds} onChange={e=>setEditing({...editing,polling_interval_seconds:e.target.value})} style={inp} type="number"/></div>
             </div>
 
-            <p style={{fontSize:11,fontWeight:700,color:'#78716C',margin:'16px 0 8px',textTransform:'uppercase',letterSpacing:'0.06em'}}>Field Mapping</p>
-            <p style={{fontSize:10,color:'#A8A29E',marginBottom:10}}>Map API field names → dashboard parameters</p>
+            <p style={{fontSize:11,fontWeight:700,color:'var(--text-muted)',margin:'16px 0 8px',textTransform:'uppercase',letterSpacing:'0.06em'}}>Field Mapping</p>
+            <p style={{fontSize:10,color:'var(--text-faint)',marginBottom:10}}>Map API field names → dashboard parameters</p>
             <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:6}}>
               {Object.entries(FIELDS).map(([k,label])=>(
                 <div key={k} style={{display:'flex',alignItems:'center',gap:8}}>
-                  <span style={{fontSize:11,fontWeight:600,color:'#57534E',width:80,flexShrink:0}}>{label}</span>
+                  <span style={{fontSize:11,fontWeight:600,color:'var(--text-mid)',width:80,flexShrink:0}}>{label}</span>
                   <input value={editing.field_mapping?.[k]||''} onChange={e=>setEditing({...editing,field_mapping:{...editing.field_mapping,[k]:e.target.value}})} style={{...inp,padding:'6px 10px',fontSize:11,fontFamily:'var(--mono)'}} placeholder="API field"/>
                 </div>
               ))}

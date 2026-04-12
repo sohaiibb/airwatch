@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { supabase, getProfile } from './lib/supabase';
 import { glass, glassInner } from './lib/utils';
 import { PermissionsProvider, usePermissions } from './lib/permissions';
-import { LayoutDashboard, BarChart3, FileText, Bell, Settings as SettingsIcon, LogOut, Wind, ChevronRight, Shield, Users, Radio, Loader2, Compass, Database, Menu } from 'lucide-react';
+import { LayoutDashboard, BarChart3, FileText, Bell, Settings as SettingsIcon, LogOut, Wind, ChevronRight, Shield, Users, Radio, Loader2, Compass, Database, Menu, Sun, Moon } from 'lucide-react';
+import TickerStrip from './components/TickerStrip';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Charts from './pages/Charts';
@@ -51,7 +52,7 @@ function NavItem({ item, active, onClick, collapsed }) {
       display: 'flex', alignItems: 'center', gap: 10, width: '100%',
       padding: collapsed ? '10px 14px' : '10px 12px', borderRadius: 12, border: 'none',
       background: active ? 'rgba(255,255,255,0.50)' : 'transparent',
-      cursor: 'pointer', color: active ? '#1C1917' : '#78716C',
+      cursor: 'pointer', color: active ? 'var(--text)' : 'var(--text-muted)',
       fontSize: 13, fontWeight: active ? 600 : 500, fontFamily: 'var(--font)',
       transition: 'all 0.2s', boxShadow: active ? '0 1px 4px rgba(0,0,0,0.04)' : 'none',
     }}
@@ -69,7 +70,7 @@ function Placeholder({ title, desc, icon: Icon }) {
       <div style={{ ...glass({ padding: '50px 60px' }), textAlign: 'center', animation: 'glassIn 0.5s ease both' }}>
         <Icon size={36} color="#A8A29E" style={{ marginBottom: 12 }} />
         <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 6px' }}>{title}</h2>
-        <p style={{ color: '#78716C', fontSize: 14 }}>{desc}</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>{desc}</p>
       </div>
     </div>
   );
@@ -82,6 +83,13 @@ function AppInner({ profile, session, onLogout }) {
   const [page, setPage] = useState('dashboard');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
+  const [dark, setDark] = useState(() => localStorage.getItem('airwatch-theme') === 'dark');
+  const [tickerVisible, setTickerVisible] = useState(() => localStorage.getItem('airwatch-ticker') !== 'off');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    localStorage.setItem('airwatch-theme', dark ? 'dark' : 'light');
+  }, [dark]);
 
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 768);
@@ -104,7 +112,7 @@ function AppInner({ profile, session, onLogout }) {
 
   function renderPage() {
     switch (page) {
-      case 'dashboard':        return <Dashboard profile={profile} />;
+      case 'dashboard':        return <Dashboard profile={profile} dark={dark} />;
       case 'charts':           return <Charts profile={profile} />;
       case 'compliance':       return hasPageAccess('compliance') ? <Compliance profile={profile} /> : <Dashboard profile={profile} />;
       case 'wind-rose':        return hasPageAccess('wind_rose') ? <WindRosePage profile={profile} /> : <Dashboard profile={profile} />;
@@ -158,7 +166,7 @@ function AppInner({ profile, session, onLogout }) {
           <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, rgba(16,185,129,0.75), rgba(6,182,212,0.75))', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.5)', flexShrink: 0 }}>
             <Wind size={18} color="#fff" />
           </div>
-          {sidebarOpen && <div><h1 style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-0.02em' }}>AirWatch<span style={{ color: '#16A34A' }}>.</span></h1><p style={{ fontSize: 10, color: '#A8A29E' }}>Hills and Field</p></div>}
+          {sidebarOpen && <div><h1 style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-0.02em' }}>AirWatch<span style={{ color: '#16A34A' }}>.</span></h1><p style={{ fontSize: 10, color: 'var(--text-faint)' }}>Hills and Field</p></div>}
         </div>
 
         <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{ position: 'absolute', top: 22, right: -12, width: 24, height: 24, borderRadius: '50%', ...glassInner(), display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.5)', zIndex: 2 }}>
@@ -166,10 +174,10 @@ function AppInner({ profile, session, onLogout }) {
         </button>
 
         <nav style={{ flex: 1, padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>
-          {sidebarOpen && <p style={{ fontSize: 10, fontWeight: 700, color: '#A8A29E', letterSpacing: '0.08em', textTransform: 'uppercase', padding: '8px 12px 4px' }}>MONITOR</p>}
+          {sidebarOpen && <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-faint)', letterSpacing: '0.08em', textTransform: 'uppercase', padding: '8px 12px 4px' }}>MONITOR</p>}
           {navItems.map(i => <NavItem key={i.id} item={i} active={page === i.id} onClick={() => navigate(i.id)} collapsed={!sidebarOpen} />)}
           {showAdminNav && <>
-            {sidebarOpen && <p style={{ fontSize: 10, fontWeight: 700, color: '#A8A29E', letterSpacing: '0.08em', textTransform: 'uppercase', padding: '16px 12px 4px' }}>ADMIN</p>}
+            {sidebarOpen && <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-faint)', letterSpacing: '0.08em', textTransform: 'uppercase', padding: '16px 12px 4px' }}>ADMIN</p>}
             {!sidebarOpen && <div style={{ borderTop: '1px solid rgba(255,255,255,0.3)', margin: '8px 4px' }} />}
             {NAV_ADMIN.map(i => <NavItem key={i.id} item={i} active={page === i.id} onClick={() => navigate(i.id)} collapsed={!sidebarOpen} />)}
           </>}
@@ -179,10 +187,24 @@ function AppInner({ profile, session, onLogout }) {
           {sidebarOpen && (
             <div style={{ padding: '8px 12px', marginBottom: 4 }}>
               <p style={{ fontSize: 13, fontWeight: 600 }}>{profile?.full_name || 'User'}</p>
-              <p style={{ fontSize: 11, color: '#A8A29E' }}>{orgName}</p>
+              <p style={{ fontSize: 11, color: 'var(--text-faint)' }}>{orgName}</p>
               {!isHFCL && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 8, background: 'rgba(59,130,246,0.10)', color: '#3B82F6' }}>CLIENT</span>}
             </div>
           )}
+          {/* Dark mode + ticker toggles */}
+          <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+            <button onClick={() => setDark(d => !d)} title={dark ? 'Light mode' : 'Dark mode'} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: sidebarOpen ? 'flex-start' : 'center', gap: 8, padding: sidebarOpen ? '8px 12px' : '8px 0', borderRadius: 10, border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 12, fontWeight: 500, fontFamily: 'var(--font)', transition: 'background 0.2s' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              {dark ? <Sun size={15} /> : <Moon size={15} />}{sidebarOpen && (dark ? 'Light Mode' : 'Dark Mode')}
+            </button>
+            {sidebarOpen && (
+              <button onClick={() => { setTickerVisible(v => { const next = !v; localStorage.setItem('airwatch-ticker', next ? 'on' : 'off'); return next; }); }} title={tickerVisible ? 'Hide ticker' : 'Show ticker'} style={{ flexShrink: 0, padding: '8px 10px', borderRadius: 10, border: 'none', background: tickerVisible ? 'rgba(34,197,94,0.12)' : 'transparent', cursor: 'pointer', color: tickerVisible ? '#22c55e' : 'var(--text-faint)', fontSize: 10, fontWeight: 700, fontFamily: 'var(--font)', transition: 'background 0.2s', letterSpacing: '0.05em' }}>
+                LIVE
+              </button>
+            )}
+          </div>
           <button onClick={onLogout} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: sidebarOpen ? '10px 12px' : '10px 14px', borderRadius: 12, border: 'none', background: 'rgba(220,38,38,0.06)', cursor: 'pointer', color: '#DC2626', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', transition: 'background 0.2s' }}
             onMouseEnter={e => e.currentTarget.style.background = 'rgba(220,38,38,0.12)'}
             onMouseLeave={e => e.currentTarget.style.background = 'rgba(220,38,38,0.06)'}
@@ -192,7 +214,14 @@ function AppInner({ profile, session, onLogout }) {
         </div>
       </aside>
 
-      <main style={{ flex: 1, marginLeft: isMobile ? 0 : (sidebarOpen ? 240 : 64), transition: 'margin-left 0.3s cubic-bezier(.16,1,.3,1)', position: 'relative', zIndex: 1, padding: isMobile ? '60px 12px 24px' : 24, maxWidth: 1400, overflowX: 'hidden', width: isMobile ? '100%' : undefined, minWidth: 0 }}>
+      {/* Ticker strip — fixed at top, respects sidebar */}
+      {tickerVisible && (
+        <div style={{ position: 'fixed', top: 0, left: isMobile ? 0 : (sidebarOpen ? 240 : 64), right: 0, zIndex: 20, transition: 'left 0.3s cubic-bezier(.16,1,.3,1)' }}>
+          <TickerStrip visible={tickerVisible} />
+        </div>
+      )}
+
+      <main style={{ flex: 1, marginLeft: isMobile ? 0 : (sidebarOpen ? 240 : 64), transition: 'margin-left 0.3s cubic-bezier(.16,1,.3,1)', position: 'relative', zIndex: 1, padding: isMobile ? `${tickerVisible ? 96 : 60}px 12px 24px` : `${tickerVisible ? 60 : 24}px 24px 24px`, maxWidth: 1400, overflowX: 'hidden', width: isMobile ? '100%' : undefined, minWidth: 0 }}>
         {renderPage()}
       </main>
     </div>

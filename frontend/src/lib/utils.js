@@ -44,8 +44,8 @@ export function getApplicableStandard(pollutantKey, dataPeriod) {
   return { ...standard, label: pollutant.label, unit: pollutant.unit, color: pollutant.color };
 }
 
-export const glass = (x = {}) => ({ background:'rgba(255,255,255,0.42)', backdropFilter:'blur(24px) saturate(1.6)', WebkitBackdropFilter:'blur(24px) saturate(1.6)', borderRadius:22, border:'1px solid rgba(255,255,255,0.55)', boxShadow:'0 2px 32px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.7), inset 0 -1px 0 rgba(255,255,255,0.15)', ...x });
-export const glassInner = (x = {}) => ({ background:'rgba(255,255,255,0.30)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', borderRadius:14, border:'1px solid rgba(255,255,255,0.45)', ...x });
+export const glass = (x = {}) => ({ background:'var(--glass-bg)', backdropFilter:'blur(24px) saturate(1.6)', WebkitBackdropFilter:'blur(24px) saturate(1.6)', borderRadius:22, border:'1px solid var(--glass-border)', boxShadow:'var(--glass-shadow)', ...x });
+export const glassInner = (x = {}) => ({ background:'var(--glass-inner-bg)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', borderRadius:14, border:'1px solid var(--glass-inner-border)', ...x });
 
 export const POLLUTANTS = [
   { key: 'pm25', name: 'PM2.5', unit: 'µg/m³', color: '#3B82F6', threshold: 35, max: 150 },

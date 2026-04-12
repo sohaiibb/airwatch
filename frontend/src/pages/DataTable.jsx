@@ -96,7 +96,7 @@ function getCellStyle(key, value, rowIdx) {
     borderBottom: '1px solid rgba(0,0,0,0.05)',
     textAlign: 'right',
     background: rowIdx % 2 === 0 ? '#ffffff' : '#f8fafc',
-    color: '#1C1917',
+    color: 'var(--text)',
   };
   const t = THRESHOLDS[key];
   if (!t || value == null || isNaN(Number(value))) return base;
@@ -607,7 +607,7 @@ export default function DataTable({ profile }) {
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 3px', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: 10 }}>
           <Database size={20} color={TEAL} /> Data
         </h1>
-        <p style={{ color: '#78716C', fontSize: 13, margin: 0 }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: 0 }}>
           Browse and export all historical monitoring records.
         </p>
       </div>
@@ -620,14 +620,14 @@ export default function DataTable({ profile }) {
 
           {/* Station */}
           <div style={{ minWidth: 180 }}>
-            <label style={{ fontSize: 10, fontWeight: 700, color: '#78716C', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5, display: 'block' }}>
+            <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5, display: 'block' }}>
               Station
             </label>
             <select
               value={stationId}
               onChange={e => { setStationId(e.target.value); setPage(0); }}
               style={{
-                padding: '7px 10px', borderRadius: 9, fontSize: 12, color: '#1C1917',
+                padding: '7px 10px', borderRadius: 9, fontSize: 12, color: 'var(--text)',
                 fontFamily: 'var(--font)', outline: 'none', width: '100%',
                 border: '1px solid rgba(255,255,255,0.5)',
                 background: 'rgba(255,255,255,0.35)', backdropFilter: 'blur(8px)',
@@ -639,7 +639,7 @@ export default function DataTable({ profile }) {
 
           {/* Presets */}
           <div>
-            <label style={{ fontSize: 10, fontWeight: 700, color: '#78716C', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5, display: 'block' }}>
+            <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5, display: 'block' }}>
               Time Range
             </label>
             <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -650,7 +650,7 @@ export default function DataTable({ profile }) {
                   style={{
                     ...btnBase, padding: '6px 12px',
                     background: presetActive(p.hours) ? TEAL : 'rgba(255,255,255,0.38)',
-                    color: presetActive(p.hours) ? '#fff' : '#44403C',
+                    color: presetActive(p.hours) ? '#fff' : 'var(--text-mid)',
                     border: presetActive(p.hours) ? `1px solid ${TEAL}` : '1px solid rgba(255,255,255,0.55)',
                   }}
                   onMouseEnter={e => { if (!presetActive(p.hours)) e.currentTarget.style.background = 'rgba(255,255,255,0.6)'; }}
@@ -664,7 +664,7 @@ export default function DataTable({ profile }) {
                 style={{
                   ...btnBase, padding: '6px 12px',
                   background: rangeMode === 'custom' ? TEAL : 'rgba(255,255,255,0.38)',
-                  color: rangeMode === 'custom' ? '#fff' : '#44403C',
+                  color: rangeMode === 'custom' ? '#fff' : 'var(--text-mid)',
                   border: rangeMode === 'custom' ? `1px solid ${TEAL}` : '1px solid rgba(255,255,255,0.55)',
                 }}
               >
@@ -679,7 +679,7 @@ export default function DataTable({ profile }) {
                 style={{
                   ...btnBase, padding: '6px 12px',
                   background: rangeMode === 'all' ? TEAL : 'rgba(255,255,255,0.38)',
-                  color: rangeMode === 'all' ? '#fff' : '#44403C',
+                  color: rangeMode === 'all' ? '#fff' : 'var(--text-mid)',
                   border: rangeMode === 'all' ? `1px solid ${TEAL}` : '1px solid rgba(255,255,255,0.55)',
                 }}
               >All Data</button>
@@ -696,7 +696,7 @@ export default function DataTable({ profile }) {
             flexDirection: isMobile ? 'column' : 'row',
           }}>
             <div>
-              <label style={{ fontSize: 10, fontWeight: 700, color: '#78716C', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5, display: 'block' }}>
+              <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5, display: 'block' }}>
                 From
               </label>
               <input
@@ -705,7 +705,7 @@ export default function DataTable({ profile }) {
                 max={pendingTo}
                 onChange={e => setPendingFrom(e.target.value)}
                 style={{
-                  padding: '7px 10px', borderRadius: 9, fontSize: 12, color: '#1C1917',
+                  padding: '7px 10px', borderRadius: 9, fontSize: 12, color: 'var(--text)',
                   fontFamily: 'var(--font)', outline: 'none',
                   border: '1px solid rgba(255,255,255,0.5)',
                   background: 'rgba(255,255,255,0.5)',
@@ -713,7 +713,7 @@ export default function DataTable({ profile }) {
               />
             </div>
             <div>
-              <label style={{ fontSize: 10, fontWeight: 700, color: '#78716C', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5, display: 'block' }}>
+              <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 5, display: 'block' }}>
                 To
               </label>
               <input
@@ -722,7 +722,7 @@ export default function DataTable({ profile }) {
                 min={pendingFrom}
                 onChange={e => setPendingTo(e.target.value)}
                 style={{
-                  padding: '7px 10px', borderRadius: 9, fontSize: 12, color: '#1C1917',
+                  padding: '7px 10px', borderRadius: 9, fontSize: 12, color: 'var(--text)',
                   fontFamily: 'var(--font)', outline: 'none',
                   border: '1px solid rgba(255,255,255,0.5)',
                   background: 'rgba(255,255,255,0.5)',
@@ -754,7 +754,7 @@ export default function DataTable({ profile }) {
                   border: 'none', cursor: 'pointer',
                   fontFamily: 'var(--font)', fontSize: 12, fontWeight: 600,
                   background: agg === o.value ? TEAL : 'rgba(255,255,255,0.38)',
-                  color: agg === o.value ? '#fff' : '#57534E',
+                  color: agg === o.value ? '#fff' : 'var(--text-mid)',
                   transition: 'all 0.15s',
                   borderRight: o.value !== 'daily' ? '1px solid rgba(255,255,255,0.4)' : 'none',
                 }}
@@ -764,7 +764,7 @@ export default function DataTable({ profile }) {
 
           {/* Search */}
           <div style={{ position: 'relative', flex: 1, minWidth: 160, maxWidth: isMobile ? '100%' : 300 }}>
-            <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#A8A29E', pointerEvents: 'none' }} />
+            <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)', pointerEvents: 'none' }} />
             <input
               type="text"
               placeholder="Filter rows…"
@@ -774,7 +774,7 @@ export default function DataTable({ profile }) {
                 width: '100%', padding: '7px 10px 7px 30px', borderRadius: 9,
                 border: '1px solid rgba(255,255,255,0.5)',
                 background: 'rgba(255,255,255,0.35)', backdropFilter: 'blur(8px)',
-                fontSize: 12, color: '#1C1917', fontFamily: 'var(--font)', outline: 'none',
+                fontSize: 12, color: 'var(--text)', fontFamily: 'var(--font)', outline: 'none',
                 boxSizing: 'border-box',
               }}
             />
@@ -784,7 +784,7 @@ export default function DataTable({ profile }) {
           <div style={{ flex: 1 }} />
 
           {/* Record count */}
-          <span style={{ fontSize: 12, color: '#57534E', whiteSpace: 'nowrap', fontFamily: 'DM Mono, monospace' }}>
+          <span style={{ fontSize: 12, color: 'var(--text-mid)', whiteSpace: 'nowrap', fontFamily: 'DM Mono, monospace' }}>
             {loading
               ? 'Loading…'
               : totalCount > 0
@@ -796,7 +796,7 @@ export default function DataTable({ profile }) {
           {/* Export */}
           <button onClick={handleExportCSV} disabled={loading || !allRows.length} style={{
             ...btnBase,
-            background: 'rgba(255,255,255,0.45)', color: '#1C1917',
+            background: 'rgba(255,255,255,0.45)', color: 'var(--text)',
             border: '1px solid rgba(255,255,255,0.6)',
             opacity: (!allRows.length || loading) ? 0.5 : 1,
           }}>
@@ -804,7 +804,7 @@ export default function DataTable({ profile }) {
           </button>
           <button onClick={handleExportExcel} disabled={loading || !allRows.length} style={{
             ...btnBase,
-            background: 'rgba(255,255,255,0.45)', color: '#1C1917',
+            background: 'rgba(255,255,255,0.45)', color: 'var(--text)',
             border: '1px solid rgba(255,255,255,0.6)',
             opacity: (!allRows.length || loading) ? 0.5 : 1,
           }}>
@@ -833,13 +833,13 @@ export default function DataTable({ profile }) {
         {loading ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 24px', gap: 12 }}>
             <Loader2 size={22} color={TEAL} style={{ animation: 'spin 1s linear infinite' }} />
-            <span style={{ fontSize: 14, color: '#57534E', fontWeight: 600 }}>Loading data…</span>
+            <span style={{ fontSize: 14, color: 'var(--text-mid)', fontWeight: 600 }}>Loading data…</span>
           </div>
         ) : visibleRows.length === 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 24px', gap: 10 }}>
             <Database size={32} color="#D6D3D1" />
-            <p style={{ fontSize: 14, color: '#A8A29E', fontWeight: 600, margin: 0 }}>No data for this period</p>
-            <p style={{ fontSize: 12, color: '#A8A29E', margin: 0 }}>Try a different date range, station, or aggregation.</p>
+            <p style={{ fontSize: 14, color: 'var(--text-faint)', fontWeight: 600, margin: 0 }}>No data for this period</p>
+            <p style={{ fontSize: 12, color: 'var(--text-faint)', margin: 0 }}>Try a different date range, station, or aggregation.</p>
           </div>
         ) : (
           <div data-scroll-x style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%', position: 'relative' }}>
@@ -910,7 +910,7 @@ export default function DataTable({ profile }) {
             padding: '10px 16px', borderTop: '1px solid rgba(0,0,0,0.06)',
             background: 'rgba(255,255,255,0.5)',
           }}>
-            <span style={{ fontSize: 11, color: '#78716C', fontFamily: 'DM Mono, monospace' }}>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Mono, monospace' }}>
               Page {page + 1} of {totalPages.toLocaleString()}
             </span>
 
@@ -926,10 +926,10 @@ export default function DataTable({ profile }) {
 
               {/* Page numbers */}
               {isPhone
-                ? <span style={{ padding: '0 8px', fontSize: 12, color: '#78716C', fontFamily: 'DM Mono, monospace' }}>{page + 1} / {totalPages.toLocaleString()}</span>
+                ? <span style={{ padding: '0 8px', fontSize: 12, color: 'var(--text-muted)', fontFamily: 'DM Mono, monospace' }}>{page + 1} / {totalPages.toLocaleString()}</span>
                 : pageNumbers().map((p, i) =>
                     p === '…'
-                      ? <span key={`ellipsis-${i}`} style={{ padding: '0 5px', color: '#A8A29E', fontSize: 12 }}>…</span>
+                      ? <span key={`ellipsis-${i}`} style={{ padding: '0 5px', color: 'var(--text-faint)', fontSize: 12 }}>…</span>
                       : <button key={p} onClick={() => handlePage(p)} style={pageBtnStyle(p === page, false)}>
                           {p + 1}
                         </button>
@@ -946,7 +946,7 @@ export default function DataTable({ profile }) {
               </button>
             </div>
 
-            <span style={{ fontSize: 11, color: '#78716C', fontFamily: 'DM Mono, monospace' }}>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'DM Mono, monospace' }}>
               {rawTotal > 0 && agg !== 'raw' ? `${rawTotal.toLocaleString()} raw readings` : `${totalCount.toLocaleString()} records`}
             </span>
           </div>
@@ -955,7 +955,7 @@ export default function DataTable({ profile }) {
 
       {/* Legend */}
       <div style={{ display: 'flex', gap: 16, marginTop: 10, padding: '0 4px' }}>
-        <span style={{ fontSize: 10, color: '#A8A29E' }}>Color coding:</span>
+        <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>Color coding:</span>
         <span style={{ fontSize: 10, color: '#92400E', background: 'rgba(234,179,8,0.09)', padding: '1px 8px', borderRadius: 4 }}>Approaching threshold</span>
         <span style={{ fontSize: 10, color: '#B91C1C', background: 'rgba(220,38,38,0.10)', padding: '1px 8px', borderRadius: 4, fontWeight: 600 }}>Exceeds NCEC limit</span>
       </div>
@@ -969,7 +969,7 @@ function pageBtnStyle(active, disabled) {
     padding: '5px 9px', borderRadius: 7, border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
     fontFamily: 'var(--font)', fontSize: 12, fontWeight: 600,
     background: active ? TEAL : 'rgba(255,255,255,0.6)',
-    color: active ? '#fff' : disabled ? '#D6D3D1' : '#44403C',
+    color: active ? '#fff' : disabled ? '#D6D3D1' : 'var(--text-mid)',
     boxShadow: active ? `0 1px 6px ${TEAL}40` : 'none',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     minWidth: 30,

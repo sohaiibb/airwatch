@@ -146,7 +146,7 @@ export default function WindRose({ profile }) {
     padding: '6px 12px', borderRadius: 8, border: 'none',
     background: active ? 'rgba(255,255,255,0.65)' : 'transparent',
     boxShadow: active ? '0 1px 4px rgba(0,0,0,0.06)' : 'none',
-    color: active ? '#1C1917' : '#78716C', fontWeight: active ? 700 : 500,
+    color: active ? 'var(--text)' : 'var(--text-muted)', fontWeight: active ? 700 : 500,
     fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all 0.2s',
   });
 
@@ -156,7 +156,7 @@ export default function WindRose({ profile }) {
       {/* Page header */}
       <div style={{ marginBottom: 24, animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) both' }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.02em' }}>Wind Rose</h1>
-        <p style={{ color: '#78716C', fontSize: 13, margin: 0 }}>Wind direction and speed distribution across 16 compass sectors.</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: 0 }}>Wind direction and speed distribution across 16 compass sectors.</p>
       </div>
 
       {isDemo && (
@@ -169,11 +169,11 @@ export default function WindRose({ profile }) {
       {/* Controls */}
       <div style={{ ...glass({ padding: '14px 20px', marginBottom: 16 }), display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.05s both' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Station</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Station</span>
           <select
             value={selIdx}
             onChange={e => setSelIdx(Number(e.target.value))}
-            style={{ padding: '7px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.35)', fontSize: 12, color: '#1C1917', fontFamily: 'var(--font)', outline: 'none' }}
+            style={{ padding: '7px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.35)', fontSize: 12, color: 'var(--text)', fontFamily: 'var(--font)', outline: 'none' }}
           >
             {stations.map((s, i) => <option key={s.id} value={i}>{s.name}</option>)}
           </select>
@@ -182,7 +182,7 @@ export default function WindRose({ profile }) {
         <div style={{ width: 1, height: 36, background: 'rgba(0,0,0,0.08)', flexShrink: 0 }} />
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Time Range</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Time Range</span>
           <div style={{ ...glassInner({ padding: '3px 4px', borderRadius: 11 }), display: 'flex', gap: 2 }}>
             {TIME_RANGES.map(t => (
               <button key={t.id} onClick={() => setTimeRange(t.id)} style={toggleBtn(timeRange === t.id)}>{t.label}</button>
@@ -190,7 +190,7 @@ export default function WindRose({ profile }) {
           </div>
         </div>
 
-        {loading && <span style={{ fontSize: 11, color: '#A8A29E', marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ display: 'inline-block', width: 12, height: 12, border: '2px solid #A8A29E', borderTop: '2px solid transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />Loading…</span>}
+        {loading && <span style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ display: 'inline-block', width: 12, height: 12, border: '2px solid #A8A29E', borderTop: '2px solid transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />Loading…</span>}
       </div>
 
       {/* Main content: rose + stats */}
@@ -208,7 +208,7 @@ export default function WindRose({ profile }) {
                     strokeDasharray={i < 3 ? '4 4' : undefined} />
                   {ring.label && (
                     <text x={CX + 3} y={CY - ring.r + 9} fontSize={9}
-                      fill="#A8A29E" fontFamily="'DM Mono',monospace">{ring.label}</text>
+                      fill="var(--text-faint)" fontFamily="'DM Mono',monospace">{ring.label}</text>
                   )}
                 </g>
               ))}
@@ -235,15 +235,15 @@ export default function WindRose({ profile }) {
               {/* Empty state */}
               {validCount === 0 && (
                 <text x={CX} y={CY + 4} textAnchor="middle" dominantBaseline="middle"
-                  fontSize={13} fill="#A8A29E" fontFamily="'Instrument Sans',sans-serif">
+                  fontSize={13} fill="var(--text-faint)" fontFamily="'Instrument Sans',sans-serif">
                   No wind data
                 </text>
               )}
 
               {/* Center circle */}
               <circle cx={CX} cy={CY} r={28} fill="rgba(255,255,255,0.80)" stroke="rgba(255,255,255,0.9)" strokeWidth={1.5} />
-              <text x={CX} y={CY - 6} textAnchor="middle" fontSize={14} fontWeight="700" fill="#1C1917" fontFamily="'DM Mono',monospace">{calmPct}%</text>
-              <text x={CX} y={CY + 8} textAnchor="middle" fontSize={8} fill="#78716C" fontFamily="'Instrument Sans',sans-serif" fontWeight="700" letterSpacing="0.08em">CALM</text>
+              <text x={CX} y={CY - 6} textAnchor="middle" fontSize={14} fontWeight="700" fill="var(--text)" fontFamily="'DM Mono',monospace">{calmPct}%</text>
+              <text x={CX} y={CY + 8} textAnchor="middle" fontSize={8} fill="var(--text-muted)" fontFamily="'Instrument Sans',sans-serif" fontWeight="700" letterSpacing="0.08em">CALM</text>
 
               {/* Direction labels */}
               {WIND_DIRS.map((dir, i) => {
@@ -255,7 +255,7 @@ export default function WindRose({ profile }) {
                     textAnchor="middle" dominantBaseline="middle"
                     fontSize={primary ? (isMobile ? 15 : 13) : inter ? (isMobile ? 12 : 10.5) : (isMobile ? 10 : 9)}
                     fontWeight={primary ? 700 : inter ? 600 : 400}
-                    fill={hovered === i ? '#16A34A' : primary ? '#1C1917' : '#78716C'}
+                    fill={hovered === i ? '#16A34A' : primary ? 'var(--text)' : 'var(--text-muted)'}
                     fontFamily="'Instrument Sans',sans-serif"
                   >{dir}</text>
                 );
@@ -265,22 +265,22 @@ export default function WindRose({ profile }) {
             {/* Sector hover tooltip */}
             {hovered !== null && sectorTotals[hovered] > 0 && (
               <div style={{ position: 'absolute', top: 8, left: 8, ...glassInner({ padding: '10px 14px' }), pointerEvents: 'none', minWidth: 175 }}>
-                <p style={{ fontSize: 14, fontWeight: 700, margin: '0 0 8px', color: '#1C1917' }}>{WIND_DIRS[hovered]}</p>
+                <p style={{ fontSize: 14, fontWeight: 700, margin: '0 0 8px', color: 'var(--text)' }}>{WIND_DIRS[hovered]}</p>
                 {WIND_SPEED_BINS.slice(1).map((bin, i) => {
                   const count = sectors[hovered][i + 1];
                   if (!count) return null;
                   return (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 5 }}>
                       <div style={{ width: 8, height: 8, borderRadius: 2, background: bin.color, flexShrink: 0 }} />
-                      <span style={{ fontSize: 10, color: '#57534E', flex: 1 }}>{bin.label}</span>
-                      <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'DM Mono, monospace', color: '#1C1917' }}>
-                        {count} <span style={{ color: '#A8A29E', fontWeight: 400 }}>({validCount > 0 ? (count / validCount * 100).toFixed(0) : 0}%)</span>
+                      <span style={{ fontSize: 10, color: 'var(--text-mid)', flex: 1 }}>{bin.label}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'DM Mono, monospace', color: 'var(--text)' }}>
+                        {count} <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>({validCount > 0 ? (count / validCount * 100).toFixed(0) : 0}%)</span>
                       </span>
                     </div>
                   );
                 })}
                 <div style={{ borderTop: '1px solid rgba(0,0,0,0.07)', marginTop: 6, paddingTop: 6, display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 10, color: '#78716C' }}>Sector total</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Sector total</span>
                   <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'DM Mono, monospace' }}>
                     {sectorTotals[hovered]} ({validCount > 0 ? (sectorTotals[hovered] / validCount * 100).toFixed(0) : 0}%)
                   </span>
@@ -295,20 +295,20 @@ export default function WindRose({ profile }) {
 
           {/* Wind statistics */}
           <div style={{ ...glass({ padding: '20px', borderRadius: 16 }), animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.15s both' }}>
-            <h3 style={{ fontSize: 12, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 14px' }}>Wind Statistics</h3>
+            <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 14px' }}>Wind Statistics</h3>
             {[
               { icon: Navigation, label: 'Predominant Dir.', value: domIdx >= 0 && sectorTotals[domIdx] > 0 ? WIND_DIRS[domIdx] : '—', color: '#16A34A' },
               { icon: Gauge,      label: 'Average Speed',    value: fmtN(avgSpeed) + ' m/s', color: '#3B82F6' },
               { icon: Activity,   label: 'Max Speed',        value: fmtN(maxSpeed) + ' m/s', color: '#EA580C' },
               { icon: Wind,       label: 'Calm ≤0.5 m/s',   value: `${calmCount} (${calmPct}%)`, color: '#8B5CF6' },
-              { icon: Wind,       label: 'Total Readings',   value: validCount, color: '#78716C' },
+              { icon: Wind,       label: 'Total Readings',   value: validCount, color: 'var(--text-muted)' },
             ].map((s, i) => {
               const Icon = s.icon;
               return (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: i < 4 ? 12 : 0, ...glassInner({ padding: '9px 12px', borderRadius: 10 }), background: `${s.color}08` }}>
                   <Icon size={13} color={s.color} style={{ flexShrink: 0 }} />
-                  <span style={{ fontSize: 11, color: '#57534E', flex: 1 }}>{s.label}</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, fontFamily: 'DM Mono, monospace', color: '#1C1917' }}>{s.value}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-mid)', flex: 1 }}>{s.label}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, fontFamily: 'DM Mono, monospace', color: 'var(--text)' }}>{s.value}</span>
                 </div>
               );
             })}
@@ -316,7 +316,7 @@ export default function WindRose({ profile }) {
 
           {/* Speed legend */}
           <div style={{ ...glass({ padding: '18px 20px', borderRadius: 16 }), animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.2s both' }}>
-            <h3 style={{ fontSize: 12, fontWeight: 700, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 12px' }}>Speed Bins</h3>
+            <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 12px' }}>Speed Bins</h3>
             {WIND_SPEED_BINS.map((bin, i) => {
               const sectorFreq = sectors.reduce((sum, s) => sum + s[i], 0);
               const pct = validCount > 0 ? (sectorFreq / validCount * 100).toFixed(0) : 0;
@@ -324,11 +324,11 @@ export default function WindRose({ profile }) {
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: i < WIND_SPEED_BINS.length - 1 ? 9 : 0 }}>
                   <div style={{ width: 30, height: 11, borderRadius: 3, background: bin.color, flexShrink: 0 }} />
                   <div style={{ flex: 1 }}>
-                    <span style={{ fontSize: 11, color: '#44403C', fontWeight: 600 }}>{bin.label}</span>
-                    <span style={{ fontSize: 10, color: '#A8A29E', marginLeft: 5 }}>{bin.range}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-mid)', fontWeight: 600 }}>{bin.label}</span>
+                    <span style={{ fontSize: 10, color: 'var(--text-faint)', marginLeft: 5 }}>{bin.range}</span>
                   </div>
-                  <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'DM Mono, monospace', color: '#78716C' }}>
-                    {i === 0 ? `${calmCount}` : sectorFreq} <span style={{ color: '#A8A29E', fontWeight: 400 }}>({pct}%)</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'DM Mono, monospace', color: 'var(--text-muted)' }}>
+                    {i === 0 ? `${calmCount}` : sectorFreq} <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>({pct}%)</span>
                   </span>
                 </div>
               );

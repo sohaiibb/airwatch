@@ -20,9 +20,9 @@ const CELL_THRESHOLDS = {
   co:   { red: 40000 },
 };
 function cellColor(key, value) {
-  if (value == null) return '#78716C';
+  if (value == null) return 'var(--text-muted)';
   const t = CELL_THRESHOLDS[key];
-  if (!t) return '#1C1917';
+  if (!t) return 'var(--text)';
   if (value >= t.red)                       return '#DC2626';
   if (t.yellow != null && value >= t.yellow) return '#CA8A04';
   return '#16A34A';
@@ -74,7 +74,7 @@ const GlassTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
     <div style={{ ...glass({ borderRadius: 10, padding: '8px 12px' }), boxShadow: '0 8px 24px rgba(0,0,0,0.1)' }}>
-      <p style={{ color: '#78716C', fontSize: 10, margin: 0, marginBottom: 4, fontFamily: 'var(--font-mono)' }}>{label}</p>
+      <p style={{ color: 'var(--text-muted)', fontSize: 10, margin: 0, marginBottom: 4, fontFamily: 'var(--font-mono)' }}>{label}</p>
       {payload.map((p, i) => (
         <p key={i} style={{ color: p.color || p.stroke, fontSize: 12, margin: '1px 0', fontWeight: 600 }}>
           {p.name}: <span style={{ fontFamily: 'var(--font-mono)' }}>{typeof p.value === 'number' ? p.value.toFixed(1) : p.value}</span>
@@ -103,16 +103,16 @@ function GasChart({ pollutant, data }) {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
             <div style={{ width: 10, height: 10, borderRadius: 3, background: color }} />
-            <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: '#1C1917' }}>{name}</h3>
+            <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: 'var(--text)' }}>{name}</h3>
             {over && <AlertTriangle size={14} color="#DC2626" />}
           </div>
-          <p style={{ fontSize: 10, color: '#A8A29E', margin: 0 }}>NCEC Limit: {threshold} {unit}</p>
+          <p style={{ fontSize: 10, color: 'var(--text-faint)', margin: 0 }}>NCEC Limit: {threshold} {unit}</p>
         </div>
         <div style={{ textAlign: 'right' }}>
           <p style={{ fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 700, color: over ? '#DC2626' : color, margin: 0, lineHeight: 1 }}>
             {current != null ? current.toFixed(1) : '—'}
           </p>
-          <p style={{ fontSize: 10, color: '#A8A29E', margin: '2px 0 0' }}>{unit}</p>
+          <p style={{ fontSize: 10, color: 'var(--text-faint)', margin: '2px 0 0' }}>{unit}</p>
           {trend && (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)', color: trend === 'up' ? '#DC2626' : '#16A34A', marginTop: 2 }}>
               {trend === 'up' ? <TrendingUp size={10} /> : <TrendingDown size={10} />}{trendPct}%
@@ -129,8 +129,8 @@ function GasChart({ pollutant, data }) {
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.04)" />
-          <XAxis dataKey="time" tick={{ fill: '#A8A29E', fontSize: 9, fontFamily: 'var(--font-mono)' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-          <YAxis tick={{ fill: '#A8A29E', fontSize: 9, fontFamily: 'var(--font-mono)' }} axisLine={false} tickLine={false} domain={[0, 'auto']} />
+          <XAxis dataKey="time" tick={{ fill: 'var(--text-faint)', fontSize: 9, fontFamily: 'var(--font-mono)' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+          <YAxis tick={{ fill: 'var(--text-faint)', fontSize: 9, fontFamily: 'var(--font-mono)' }} axisLine={false} tickLine={false} domain={[0, 'auto']} />
           <Tooltip content={<GlassTooltip />} />
           <ReferenceLine y={threshold} stroke="#DC262680" strokeDasharray="4 4" label={{ value: 'NCEC', position: 'right', fontSize: 9, fill: '#DC2626' }} />
           <Area type="monotone" dataKey={key} stroke={color} fill={`url(#grad-${key})`} strokeWidth={2} dot={false} name={name} />
@@ -139,8 +139,8 @@ function GasChart({ pollutant, data }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.25)' }}>
         {[{ label: 'Min', value: min }, { label: 'Avg', value: avg }, { label: 'Max', value: maxVal }, { label: 'Limit', value: threshold }].map((s, i) => (
           <div key={i} style={{ textAlign: 'center' }}>
-            <p style={{ fontSize: 9, color: '#A8A29E', margin: 0, fontWeight: 600, textTransform: 'uppercase' }}>{s.label}</p>
-            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: s.label === 'Max' && s.value > threshold ? '#DC2626' : '#1C1917', margin: '1px 0 0' }}>
+            <p style={{ fontSize: 9, color: 'var(--text-faint)', margin: 0, fontWeight: 600, textTransform: 'uppercase' }}>{s.label}</p>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: s.label === 'Max' && s.value > threshold ? '#DC2626' : 'var(--text)', margin: '1px 0 0' }}>
               {s.value != null ? s.value.toFixed(1) : '—'}
             </p>
           </div>
@@ -282,18 +282,18 @@ export default function Charts({ profile }) {
   }
 
   // ─── Shared button style ───
-  const toggleBtn = (active, color = '#1C1917') => ({
+  const toggleBtn = (active, color = 'var(--text)') => ({
     padding: '5px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
     background: active ? 'rgba(255,255,255,0.7)' : 'transparent',
     boxShadow: active ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
     fontSize: 11, fontWeight: active ? 700 : 500,
-    color: active ? color : '#A8A29E',
+    color: active ? color : 'var(--text-faint)',
     transition: 'all 0.2s', fontFamily: 'var(--font)',
   });
 
   const thStyle = (col) => ({
     padding: '8px 10px', textAlign: 'left', borderBottom: '2px solid rgba(255,255,255,0.4)',
-    color: sortKey === col ? '#1C1917' : '#78716C',
+    color: sortKey === col ? 'var(--text)' : 'var(--text-muted)',
     fontWeight: 700, fontSize: 10, whiteSpace: 'nowrap',
     cursor: 'pointer', userSelect: 'none',
     background: sortKey === col ? 'rgba(255,255,255,0.25)' : 'transparent',
@@ -310,7 +310,7 @@ export default function Charts({ profile }) {
               padding: '6px 12px', borderRadius: 9, border: 'none', cursor: 'pointer',
               background: selIdx === i ? 'rgba(255,255,255,0.65)' : 'transparent',
               boxShadow: selIdx === i ? '0 1px 4px rgba(0,0,0,0.06)' : 'none',
-              fontSize: 11, fontWeight: selIdx === i ? 700 : 500, color: selIdx === i ? '#1C1917' : '#78716C',
+              fontSize: 11, fontWeight: selIdx === i ? 700 : 500, color: selIdx === i ? 'var(--text)' : 'var(--text-muted)',
               whiteSpace: 'nowrap', transition: 'all 0.2s', fontFamily: 'var(--font)',
             }}>{s.name}</button>
           ))}
@@ -323,7 +323,7 @@ export default function Charts({ profile }) {
                 borderRadius: 7, border: 'none', cursor: 'pointer',
                 fontSize: 11, fontWeight: 600, fontFamily: 'var(--font-mono)',
                 background: timeRange === t ? 'rgba(255,255,255,0.7)' : 'transparent',
-                color: timeRange === t ? '#1C1917' : '#A8A29E',
+                color: timeRange === t ? 'var(--text)' : 'var(--text-faint)',
                 boxShadow: timeRange === t ? '0 1px 3px rgba(0,0,0,0.05)' : 'none',
                 transition: 'all 0.2s',
               }}>{t}</button>
@@ -352,7 +352,7 @@ export default function Charts({ profile }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div>
             <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>Multi-Pollutant Overlay</h2>
-            <p style={{ color: '#A8A29E', fontSize: 11, margin: '2px 0 0' }}>Compare pollutants on one chart — click to toggle</p>
+            <p style={{ color: 'var(--text-faint)', fontSize: 11, margin: '2px 0 0' }}>Compare pollutants on one chart — click to toggle</p>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
@@ -360,7 +360,7 @@ export default function Charts({ profile }) {
             <button key={p.key} onClick={() => toggleOverlay(p.key)} style={{
               padding: '4px 12px', borderRadius: 8, border: `1.5px solid ${overlayKeys.includes(p.key) ? p.color : 'rgba(255,255,255,0.4)'}`,
               background: overlayKeys.includes(p.key) ? `${p.color}15` : 'transparent',
-              cursor: 'pointer', fontSize: 11, fontWeight: 600, color: overlayKeys.includes(p.key) ? p.color : '#A8A29E',
+              cursor: 'pointer', fontSize: 11, fontWeight: 600, color: overlayKeys.includes(p.key) ? p.color : 'var(--text-faint)',
               transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'var(--font)',
             }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: overlayKeys.includes(p.key) ? p.color : '#D6D3D1' }} />
@@ -371,8 +371,8 @@ export default function Charts({ profile }) {
         <ResponsiveContainer width="100%" height={isMobile ? 200 : 300}>
           <LineChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.04)" />
-            <XAxis dataKey="time" tick={{ fill: '#A8A29E', fontSize: 10, fontFamily: 'var(--font-mono)' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-            <YAxis tick={{ fill: '#A8A29E', fontSize: 10, fontFamily: 'var(--font-mono)' }} axisLine={false} tickLine={false} />
+            <XAxis dataKey="time" tick={{ fill: 'var(--text-faint)', fontSize: 10, fontFamily: 'var(--font-mono)' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+            <YAxis tick={{ fill: 'var(--text-faint)', fontSize: 10, fontFamily: 'var(--font-mono)' }} axisLine={false} tickLine={false} />
             <Tooltip content={<GlassTooltip />} />
             {POLLUTANTS.filter(p => overlayKeys.includes(p.key)).map(p => (
               <Line key={p.key} type="monotone" dataKey={p.key} stroke={p.color} strokeWidth={2} dot={false} name={p.name} />
@@ -405,7 +405,7 @@ export default function Charts({ profile }) {
 
           {/* Search filter */}
           <div style={{ position: 'relative' }}>
-            <Search size={12} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#A8A29E', pointerEvents: 'none' }} />
+            <Search size={12} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)', pointerEvents: 'none' }} />
             <input
               value={filter}
               onChange={e => setFilter(e.target.value)}
@@ -414,7 +414,7 @@ export default function Charts({ profile }) {
                 paddingLeft: 28, paddingRight: 10, paddingTop: 6, paddingBottom: 6,
                 borderRadius: 9, border: '1px solid rgba(255,255,255,0.5)',
                 background: 'rgba(255,255,255,0.35)', backdropFilter: 'blur(8px)',
-                fontSize: 11, color: '#1C1917', fontFamily: 'var(--font)',
+                fontSize: 11, color: 'var(--text)', fontFamily: 'var(--font)',
                 outline: 'none', width: 190,
               }}
             />
@@ -440,7 +440,7 @@ export default function Charts({ profile }) {
                 {POLLUTANTS.map(p => (
                   <th key={p.key} style={thStyle(p.key)} onClick={() => handleSort(p.key)}>
                     {p.name}
-                    <span style={{ color: '#A8A29E', fontWeight: 400, marginLeft: 2 }}>{p.unit}</span>
+                    <span style={{ color: 'var(--text-faint)', fontWeight: 400, marginLeft: 2 }}>{p.unit}</span>
                     <SortArrow col={p.key} sortKey={sortKey} sortDir={sortDir} />
                   </th>
                 ))}
@@ -452,7 +452,7 @@ export default function Charts({ profile }) {
                 ].map(col => (
                   <th key={col.key} style={thStyle(col.key)} onClick={() => handleSort(col.key)}>
                     {col.label}
-                    <span style={{ color: '#A8A29E', fontWeight: 400, marginLeft: 2 }}>{col.unit}</span>
+                    <span style={{ color: 'var(--text-faint)', fontWeight: 400, marginLeft: 2 }}>{col.unit}</span>
                     <SortArrow col={col.key} sortKey={sortKey} sortDir={sortDir} />
                   </th>
                 ))}
@@ -461,7 +461,7 @@ export default function Charts({ profile }) {
             <tbody>
               {pageRows.length === 0 ? (
                 <tr>
-                  <td colSpan={99} style={{ padding: '24px', textAlign: 'center', color: '#A8A29E', fontFamily: 'var(--font)' }}>
+                  <td colSpan={99} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)', fontFamily: 'var(--font)' }}>
                     No readings match your filter.
                   </td>
                 </tr>
@@ -471,12 +471,12 @@ export default function Charts({ profile }) {
                   onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? 'rgba(255,255,255,0.15)' : 'transparent'}
                 >
                   {/* Timestamp */}
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap', color: '#57534E', position: 'sticky', left: 0, zIndex: 1, background: 'inherit' }}>
+                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap', color: 'var(--text-mid)', position: 'sticky', left: 0, zIndex: 1, background: 'inherit' }}>
                     {fmtTs(row.timestamp)}
                   </td>
                   {/* Count */}
                   {showCount && (
-                    <td style={{ padding: '6px 10px', color: '#78716C', textAlign: 'center' }}>{row.count}</td>
+                    <td style={{ padding: '6px 10px', color: 'var(--text-muted)', textAlign: 'center' }}>{row.count}</td>
                   )}
                   {/* Pollutant cells */}
                   {POLLUTANTS.map(p => {
@@ -484,15 +484,15 @@ export default function Charts({ profile }) {
                     const color = cellColor(p.key, v);
                     const bg    = cellBg(p.key, v);
                     return (
-                      <td key={p.key} style={{ padding: '6px 10px', color, fontWeight: color !== '#1C1917' && color !== '#78716C' ? 700 : 400, background: bg, transition: 'background 0.15s' }}>
+                      <td key={p.key} style={{ padding: '6px 10px', color, fontWeight: color !== 'var(--text)' && color !== 'var(--text-muted)' ? 700 : 400, background: bg, transition: 'background 0.15s' }}>
                         {v != null ? v.toFixed(1) : '—'}
                       </td>
                     );
                   })}
                   {/* Met cells */}
-                  <td style={{ padding: '6px 10px', color: '#1C1917' }}>{row.temperature != null ? row.temperature.toFixed(1) : '—'}</td>
-                  <td style={{ padding: '6px 10px', color: '#1C1917' }}>{row.humidity    != null ? row.humidity.toFixed(0)    : '—'}</td>
-                  <td style={{ padding: '6px 10px', color: '#1C1917' }}>{row.wind_speed  != null ? row.wind_speed.toFixed(1)  : '—'}</td>
+                  <td style={{ padding: '6px 10px', color: 'var(--text)' }}>{row.temperature != null ? row.temperature.toFixed(1) : '—'}</td>
+                  <td style={{ padding: '6px 10px', color: 'var(--text)' }}>{row.humidity    != null ? row.humidity.toFixed(0)    : '—'}</td>
+                  <td style={{ padding: '6px 10px', color: 'var(--text)' }}>{row.wind_speed  != null ? row.wind_speed.toFixed(1)  : '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -501,7 +501,7 @@ export default function Charts({ profile }) {
 
         {/* Pagination footer */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, flexWrap: 'wrap', gap: 8 }}>
-          <span style={{ fontSize: 11, color: '#78716C', fontFamily: 'var(--font)' }}>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font)' }}>
             {tableRows.length === 0
               ? 'No readings'
               : `Showing ${page * PAGE_SIZE + 1}–${Math.min((page + 1) * PAGE_SIZE, tableRows.length)} of ${tableRows.length} ${aggMode === 'raw' ? 'readings' : 'periods'}`
@@ -511,17 +511,17 @@ export default function Charts({ profile }) {
             <button
               onClick={() => setPage(0)}
               disabled={page === 0}
-              style={{ ...glassInner({ padding: '4px 8px', borderRadius: 7 }), border: 'none', cursor: page === 0 ? 'default' : 'pointer', fontSize: 10, color: page === 0 ? '#D6D3D1' : '#57534E', fontFamily: 'var(--font)' }}
+              style={{ ...glassInner({ padding: '4px 8px', borderRadius: 7 }), border: 'none', cursor: page === 0 ? 'default' : 'pointer', fontSize: 10, color: page === 0 ? '#D6D3D1' : 'var(--text-mid)', fontFamily: 'var(--font)' }}
             >«</button>
             <button
               onClick={() => setPage(p => Math.max(0, p - 1))}
               disabled={page === 0}
-              style={{ ...glassInner({ padding: '4px 7px', borderRadius: 7 }), border: 'none', cursor: page === 0 ? 'default' : 'pointer', color: page === 0 ? '#D6D3D1' : '#57534E', display: 'flex', alignItems: 'center' }}
+              style={{ ...glassInner({ padding: '4px 7px', borderRadius: 7 }), border: 'none', cursor: page === 0 ? 'default' : 'pointer', color: page === 0 ? '#D6D3D1' : 'var(--text-mid)', display: 'flex', alignItems: 'center' }}
             ><ChevronLeft size={13} /></button>
 
             {/* Page number pills */}
             {isPhone
-              ? <span style={{ fontSize: 11, color: '#78716C', fontFamily: 'var(--font-mono)', padding: '0 6px' }}>{page + 1} / {totalPages}</span>
+              ? <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', padding: '0 6px' }}>{page + 1} / {totalPages}</span>
               : Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   const offset = Math.max(0, Math.min(page - 2, totalPages - 5));
                   const pg = offset + i;
@@ -530,7 +530,7 @@ export default function Charts({ profile }) {
                       width: 28, height: 28, borderRadius: 7, border: 'none', cursor: 'pointer',
                       background: pg === page ? 'rgba(255,255,255,0.7)' : 'transparent',
                       boxShadow: pg === page ? '0 1px 3px rgba(0,0,0,0.07)' : 'none',
-                      fontSize: 11, fontWeight: pg === page ? 700 : 400, color: pg === page ? '#1C1917' : '#78716C',
+                      fontSize: 11, fontWeight: pg === page ? 700 : 400, color: pg === page ? 'var(--text)' : 'var(--text-muted)',
                       fontFamily: 'var(--font-mono)',
                     }}>{pg + 1}</button>
                   );
@@ -540,12 +540,12 @@ export default function Charts({ profile }) {
             <button
               onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
-              style={{ ...glassInner({ padding: '4px 7px', borderRadius: 7 }), border: 'none', cursor: page >= totalPages - 1 ? 'default' : 'pointer', color: page >= totalPages - 1 ? '#D6D3D1' : '#57534E', display: 'flex', alignItems: 'center' }}
+              style={{ ...glassInner({ padding: '4px 7px', borderRadius: 7 }), border: 'none', cursor: page >= totalPages - 1 ? 'default' : 'pointer', color: page >= totalPages - 1 ? '#D6D3D1' : 'var(--text-mid)', display: 'flex', alignItems: 'center' }}
             ><ChevronRight size={13} /></button>
             <button
               onClick={() => setPage(totalPages - 1)}
               disabled={page >= totalPages - 1}
-              style={{ ...glassInner({ padding: '4px 8px', borderRadius: 7 }), border: 'none', cursor: page >= totalPages - 1 ? 'default' : 'pointer', fontSize: 10, color: page >= totalPages - 1 ? '#D6D3D1' : '#57534E', fontFamily: 'var(--font)' }}
+              style={{ ...glassInner({ padding: '4px 8px', borderRadius: 7 }), border: 'none', cursor: page >= totalPages - 1 ? 'default' : 'pointer', fontSize: 10, color: page >= totalPages - 1 ? '#D6D3D1' : 'var(--text-mid)', fontFamily: 'var(--font)' }}
             >»</button>
           </div>
         </div>

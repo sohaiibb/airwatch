@@ -14,7 +14,7 @@ const BACKEND = import.meta.env.VITE_BACKEND_URL || '';
 // ── Shared micro-components ───────────────────────────────────────────────────
 
 function Badge({ children, color = 'green' }) {
-  const colors = { green: ['rgba(22,163,74,0.12)', '#16A34A'], red: ['rgba(220,38,38,0.10)', '#DC2626'], gray: ['rgba(0,0,0,0.07)', '#78716C'], blue: ['rgba(59,130,246,0.10)', '#3B82F6'], orange: ['rgba(234,88,12,0.10)', '#EA580C'] };
+  const colors = { green: ['rgba(22,163,74,0.12)', '#16A34A'], red: ['rgba(220,38,38,0.10)', '#DC2626'], gray: ['rgba(0,0,0,0.07)', 'var(--text-muted)'], blue: ['rgba(59,130,246,0.10)', '#3B82F6'], orange: ['rgba(234,88,12,0.10)', '#EA580C'] };
   const [bg, fg] = colors[color] || colors.green;
   return <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20, background: bg, color: fg, letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{children}</span>;
 }
@@ -23,7 +23,7 @@ function Tabs({ tabs, active, onChange }) {
   return (
     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 20, padding: '4px', borderRadius: 12, background: 'rgba(0,0,0,0.04)' }}>
       {tabs.map(t => (
-        <button key={t.id} onClick={() => onChange(t.id)} style={{ padding: '7px 14px', borderRadius: 9, border: 'none', background: active === t.id ? 'rgba(255,255,255,0.85)' : 'transparent', color: active === t.id ? '#1C1917' : '#78716C', fontSize: 12, fontWeight: active === t.id ? 700 : 500, fontFamily: 'var(--font)', cursor: 'pointer', transition: 'all 0.15s', boxShadow: active === t.id ? '0 1px 4px rgba(0,0,0,0.06)' : 'none' }}>{t.label}</button>
+        <button key={t.id} onClick={() => onChange(t.id)} style={{ padding: '7px 14px', borderRadius: 9, border: 'none', background: active === t.id ? 'rgba(255,255,255,0.85)' : 'transparent', color: active === t.id ? 'var(--text)' : 'var(--text-muted)', fontSize: 12, fontWeight: active === t.id ? 700 : 500, fontFamily: 'var(--font)', cursor: 'pointer', transition: 'all 0.15s', boxShadow: active === t.id ? '0 1px 4px rgba(0,0,0,0.06)' : 'none' }}>{t.label}</button>
       ))}
     </div>
   );
@@ -40,7 +40,7 @@ function Toggle({ value, onChange }) {
 function Field({ label, children }) {
   return (
     <div style={{ marginBottom: 14 }}>
-      <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#78716C', marginBottom: 5, letterSpacing: '0.02em', textTransform: 'uppercase' }}>{label}</label>
+      <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 5, letterSpacing: '0.02em', textTransform: 'uppercase' }}>{label}</label>
       {children}
     </div>
   );
@@ -49,7 +49,7 @@ function Field({ label, children }) {
 function Input({ value, onChange, placeholder, type = 'text', disabled }) {
   return (
     <input type={type} value={value ?? ''} onChange={e => onChange?.(e.target.value)} placeholder={placeholder} disabled={disabled}
-      style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.45)', background: disabled ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.35)', fontSize: 13, fontFamily: 'var(--font)', color: '#1C1917', outline: 'none' }} />
+      style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.45)', background: disabled ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.35)', fontSize: 13, fontFamily: 'var(--font)', color: 'var(--text)', outline: 'none' }} />
   );
 }
 
@@ -57,7 +57,7 @@ function Btn({ onClick, disabled, loading, variant = 'primary', size = 'md', chi
   const styles = {
     primary: { background: 'rgba(22,163,74,0.12)', color: '#16A34A' },
     danger:  { background: 'rgba(220,38,38,0.10)', color: '#DC2626' },
-    ghost:   { background: 'rgba(0,0,0,0.06)', color: '#57534E' },
+    ghost:   { background: 'rgba(0,0,0,0.06)', color: 'var(--text-mid)' },
     blue:    { background: 'rgba(59,130,246,0.10)', color: '#3B82F6' },
   };
   const pad = size === 'sm' ? '6px 12px' : '9px 18px';
@@ -165,10 +165,10 @@ function PermissionsTab({ org, stations }) {
         </div>
 
         {/* Parameters */}
-        <p style={{ fontSize: 11, fontWeight: 700, color: '#A8A29E', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Parameters Access</p>
+        <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-faint)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Parameters Access</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
           {PARAMS.map(param => (
-            <button key={param.key} onClick={() => mergePerms(stationId, 'visible_parameters', { [param.key]: !vis[param.key] })} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 8, border: `1.5px solid ${vis[param.key] ? '#16A34A' : 'rgba(0,0,0,0.12)'}`, background: vis[param.key] ? 'rgba(22,163,74,0.10)' : 'rgba(0,0,0,0.03)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)', color: vis[param.key] ? '#16A34A' : '#78716C' }}>
+            <button key={param.key} onClick={() => mergePerms(stationId, 'visible_parameters', { [param.key]: !vis[param.key] })} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 8, border: `1.5px solid ${vis[param.key] ? '#16A34A' : 'rgba(0,0,0,0.12)'}`, background: vis[param.key] ? 'rgba(22,163,74,0.10)' : 'rgba(0,0,0,0.03)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)', color: vis[param.key] ? '#16A34A' : 'var(--text-muted)' }}>
               {vis[param.key] ? <Check size={11} /> : <X size={11} />} {param.label}
             </button>
           ))}
@@ -177,10 +177,10 @@ function PermissionsTab({ org, stations }) {
         </div>
 
         {/* Pages */}
-        <p style={{ fontSize: 11, fontWeight: 700, color: '#A8A29E', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Page Access</p>
+        <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-faint)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Page Access</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
           {PAGES.map(pg => (
-            <button key={pg.key} onClick={() => mergePerms(stationId, 'page_access', { [pg.key]: !pages[pg.key] })} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 8, border: `1.5px solid ${pages[pg.key] ? '#3B82F6' : 'rgba(0,0,0,0.12)'}`, background: pages[pg.key] ? 'rgba(59,130,246,0.10)' : 'rgba(0,0,0,0.03)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)', color: pages[pg.key] ? '#3B82F6' : '#78716C' }}>
+            <button key={pg.key} onClick={() => mergePerms(stationId, 'page_access', { [pg.key]: !pages[pg.key] })} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 8, border: `1.5px solid ${pages[pg.key] ? '#3B82F6' : 'rgba(0,0,0,0.12)'}`, background: pages[pg.key] ? 'rgba(59,130,246,0.10)' : 'rgba(0,0,0,0.03)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)', color: pages[pg.key] ? '#3B82F6' : 'var(--text-muted)' }}>
               {pages[pg.key] ? <Check size={11} /> : <X size={11} />} {pg.label}
             </button>
           ))}
@@ -189,15 +189,15 @@ function PermissionsTab({ org, stations }) {
         {/* Report + Data access side by side */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
           <div>
-            <p style={{ fontSize: 11, fontWeight: 700, color: '#A8A29E', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Report Permissions</p>
+            <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-faint)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Report Permissions</p>
             {[['preview', 'Preview'], ['pdf', 'Download PDF'], ['csv', 'Download CSV'], ['excel', 'Download Excel']].map(([k, lbl]) => (
               <div key={k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
-                <span style={{ fontSize: 12, color: '#44403C' }}>{lbl}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-mid)' }}>{lbl}</span>
                 <Toggle value={!!rep[k]} onChange={v => mergePerms(stationId, 'report_access', { [k]: v })} />
               </div>
             ))}
             <div style={{ marginTop: 10 }}>
-              <label style={{ fontSize: 11, fontWeight: 600, color: '#78716C', display: 'block', marginBottom: 4 }}>Max Date Range</label>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Max Date Range</label>
               <select value={rep.max_days ?? ''} onChange={e => mergePerms(stationId, 'report_access', { max_days: e.target.value ? +e.target.value : null })} style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.35)', fontSize: 12, fontFamily: 'var(--font)', outline: 'none' }}>
                 <option value="">Unlimited</option>
                 <option value="7">7 days</option>
@@ -207,12 +207,12 @@ function PermissionsTab({ org, stations }) {
               </select>
             </div>
             <div style={{ marginTop: 10 }}>
-              <label style={{ fontSize: 11, fontWeight: 600, color: '#78716C', display: 'block', marginBottom: 6 }}>Averaging Periods</label>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Averaging Periods</label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                 {AVERAGING.map(a => {
                   const enabled = (rep.averaging || []).includes(a);
                   return (
-                    <button key={a} onClick={() => mergePerms(stationId, 'report_access', { averaging: enabled ? (rep.averaging || []).filter(x => x !== a) : [...(rep.averaging || []), a] })} style={{ padding: '4px 8px', borderRadius: 6, border: `1.5px solid ${enabled ? '#8B5CF6' : 'rgba(0,0,0,0.12)'}`, background: enabled ? 'rgba(139,92,246,0.10)' : 'rgba(0,0,0,0.03)', cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: 'var(--font)', color: enabled ? '#8B5CF6' : '#78716C' }}>{a}</button>
+                    <button key={a} onClick={() => mergePerms(stationId, 'report_access', { averaging: enabled ? (rep.averaging || []).filter(x => x !== a) : [...(rep.averaging || []), a] })} style={{ padding: '4px 8px', borderRadius: 6, border: `1.5px solid ${enabled ? '#8B5CF6' : 'rgba(0,0,0,0.12)'}`, background: enabled ? 'rgba(139,92,246,0.10)' : 'rgba(0,0,0,0.03)', cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: 'var(--font)', color: enabled ? '#8B5CF6' : 'var(--text-muted)' }}>{a}</button>
                   );
                 })}
               </div>
@@ -220,15 +220,15 @@ function PermissionsTab({ org, stations }) {
           </div>
 
           <div>
-            <p style={{ fontSize: 11, fontWeight: 700, color: '#A8A29E', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Data Table Permissions</p>
+            <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-faint)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Data Table Permissions</p>
             {[['raw', 'Raw Data'], ['1min', '1-Min Data'], ['hourly', 'Hourly Data'], ['daily', 'Daily Data'], ['csv', 'Export CSV'], ['excel', 'Export Excel']].map(([k, lbl]) => (
               <div key={k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
-                <span style={{ fontSize: 12, color: '#44403C' }}>{lbl}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-mid)' }}>{lbl}</span>
                 <Toggle value={!!dat[k]} onChange={v => mergePerms(stationId, 'data_access', { [k]: v })} />
               </div>
             ))}
             <div style={{ marginTop: 10 }}>
-              <label style={{ fontSize: 11, fontWeight: 600, color: '#78716C', display: 'block', marginBottom: 4 }}>Max Date Range</label>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Max Date Range</label>
               <select value={dat.max_days ?? ''} onChange={e => mergePerms(stationId, 'data_access', { max_days: e.target.value ? +e.target.value : null })} style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.35)', fontSize: 12, fontFamily: 'var(--font)', outline: 'none' }}>
                 <option value="">Unlimited</option>
                 <option value="7">7 days</option>
@@ -249,12 +249,12 @@ function PermissionsTab({ org, stations }) {
 
   return (
     <div>
-      <p style={{ fontSize: 12, color: '#78716C', marginBottom: 16 }}>Configure what this client can see and do. Permissions apply to all assigned stations unless overridden per station.</p>
+      <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>Configure what this client can see and do. Permissions apply to all assigned stations unless overridden per station.</p>
       <PermCard stationId={null} stationName="Global (All Stations)" />
       {stations.map(s => (
         <PermCard key={s.id} stationId={s.id} stationName={s.name} />
       ))}
-      {stations.length === 0 && <p style={{ fontSize: 13, color: '#A8A29E', fontStyle: 'italic' }}>Assign stations first to set per-station permissions.</p>}
+      {stations.length === 0 && <p style={{ fontSize: 13, color: 'var(--text-faint)', fontStyle: 'italic' }}>Assign stations first to set per-station permissions.</p>}
     </div>
   );
 }
@@ -404,7 +404,7 @@ export default function AdminClients() {
           <Field label="Status">
             <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
               {[true, false].map(v => (
-                <button key={String(v)} onClick={() => setEditOrg(e => ({ ...e, is_active: v }))} style={{ flex: 1, padding: '8px 0', borderRadius: 9, border: `1.5px solid ${editOrg.is_active === v ? (v ? '#16A34A' : '#DC2626') : 'rgba(0,0,0,0.12)'}`, background: editOrg.is_active === v ? (v ? 'rgba(22,163,74,0.10)' : 'rgba(220,38,38,0.08)') : 'transparent', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)', cursor: 'pointer', color: editOrg.is_active === v ? (v ? '#16A34A' : '#DC2626') : '#78716C' }}>
+                <button key={String(v)} onClick={() => setEditOrg(e => ({ ...e, is_active: v }))} style={{ flex: 1, padding: '8px 0', borderRadius: 9, border: `1.5px solid ${editOrg.is_active === v ? (v ? '#16A34A' : '#DC2626') : 'rgba(0,0,0,0.12)'}`, background: editOrg.is_active === v ? (v ? 'rgba(22,163,74,0.10)' : 'rgba(220,38,38,0.08)') : 'transparent', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)', cursor: 'pointer', color: editOrg.is_active === v ? (v ? '#16A34A' : '#DC2626') : 'var(--text-muted)' }}>
                   {v ? 'Active' : 'Inactive'}
                 </button>
               ))}
@@ -435,7 +435,7 @@ export default function AdminClients() {
         {/* Assign */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
           <div style={{ position: 'relative', flex: 1 }}>
-            <select value={assignStation} onChange={e => setAssignStation(e.target.value)} style={{ width: '100%', padding: '9px 32px 9px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.35)', fontSize: 13, fontFamily: 'var(--font)', color: '#1C1917', outline: 'none', appearance: 'none' }}>
+            <select value={assignStation} onChange={e => setAssignStation(e.target.value)} style={{ width: '100%', padding: '9px 32px 9px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.35)', fontSize: 13, fontFamily: 'var(--font)', color: 'var(--text)', outline: 'none', appearance: 'none' }}>
               <option value="">Select station to assign…</option>
               {availableStations.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
@@ -445,7 +445,7 @@ export default function AdminClients() {
 
         {/* List */}
         {orgStations.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '32px 0', color: '#A8A29E' }}>
+          <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-faint)' }}>
             <Building2 size={28} color="#D6D3D1" style={{ marginBottom: 8 }} />
             <p style={{ fontSize: 13 }}>No stations assigned. Assign a station to give this client access.</p>
           </div>
@@ -453,7 +453,7 @@ export default function AdminClients() {
           <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.25)', border: '1px solid rgba(255,255,255,0.4)', marginBottom: 8 }}>
             <div style={{ flex: 1 }}>
               <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>{s.name}</p>
-              <p style={{ fontSize: 11, color: '#78716C', margin: '2px 0 0', fontFamily: 'var(--mono)' }}>{s.device_id || 'No device ID'}</p>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '2px 0 0', fontFamily: 'var(--mono)' }}>{s.device_id || 'No device ID'}</p>
             </div>
             <Badge color={s.status === 'online' ? 'green' : s.status === 'offline' ? 'red' : 'orange'}>{s.status || 'unknown'}</Badge>
             <Btn size="sm" variant="danger" onClick={() => unassignStation(s.id)}><X size={12} /> Remove</Btn>
@@ -485,7 +485,7 @@ export default function AdminClients() {
             <Field label="Role">
               <div style={{ display: 'flex', gap: 8 }}>
                 {ROLES.map(r => (
-                  <button key={r.value} onClick={() => setInviteForm(f => ({ ...f, role: r.value }))} style={{ flex: 1, padding: '8px 0', borderRadius: 9, border: `1.5px solid ${inviteForm.role === r.value ? '#3B82F6' : 'rgba(0,0,0,0.12)'}`, background: inviteForm.role === r.value ? 'rgba(59,130,246,0.10)' : 'transparent', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)', cursor: 'pointer', color: inviteForm.role === r.value ? '#3B82F6' : '#78716C' }}>{r.label}</button>
+                  <button key={r.value} onClick={() => setInviteForm(f => ({ ...f, role: r.value }))} style={{ flex: 1, padding: '8px 0', borderRadius: 9, border: `1.5px solid ${inviteForm.role === r.value ? '#3B82F6' : 'rgba(0,0,0,0.12)'}`, background: inviteForm.role === r.value ? 'rgba(59,130,246,0.10)' : 'transparent', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)', cursor: 'pointer', color: inviteForm.role === r.value ? '#3B82F6' : 'var(--text-muted)' }}>{r.label}</button>
                 ))}
               </div>
             </Field>
@@ -498,7 +498,7 @@ export default function AdminClients() {
                 {inviteForm.result.ok ? (
                   <>
                     <p style={{ fontSize: 12, fontWeight: 700, color: '#16A34A', margin: '0 0 4px' }}>✓ Invitation sent to {inviteForm.result.email}</p>
-                    {inviteForm.result.reset_url && <p style={{ fontSize: 11, color: '#78716C', margin: 0 }}>Password reset link generated. User will receive an email to set their password.</p>}
+                    {inviteForm.result.reset_url && <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>Password reset link generated. User will receive an email to set their password.</p>}
                   </>
                 ) : (
                   <p style={{ fontSize: 12, fontWeight: 700, color: '#DC2626', margin: 0 }}>✗ {inviteForm.result.msg}</p>
@@ -509,7 +509,7 @@ export default function AdminClients() {
         )}
 
         {orgUsers.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '32px 0', color: '#A8A29E' }}>
+          <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-faint)' }}>
             <Users size={28} color="#D6D3D1" style={{ marginBottom: 8 }} />
             <p style={{ fontSize: 13 }}>No users in this organization.</p>
           </div>
@@ -517,8 +517,8 @@ export default function AdminClients() {
           <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.25)', border: '1px solid rgba(255,255,255,0.4)', marginBottom: 8, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 140 }}>
               <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>{u.full_name || '—'}</p>
-              <p style={{ fontSize: 11, color: '#78716C', margin: '2px 0 0' }}>{u.email || '—'}</p>
-              {u.last_login && <p style={{ fontSize: 10, color: '#A8A29E', margin: '2px 0 0' }}>Last: {new Date(u.last_login).toLocaleDateString()}</p>}
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '2px 0 0' }}>{u.email || '—'}</p>
+              {u.last_login && <p style={{ fontSize: 10, color: 'var(--text-faint)', margin: '2px 0 0' }}>Last: {new Date(u.last_login).toLocaleDateString()}</p>}
             </div>
             <select value={u.role} onChange={e => updateUser(u.id, { role: e.target.value })} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.35)', fontSize: 12, fontFamily: 'var(--font)', outline: 'none' }}>
               <option value="viewer">Client Viewer</option>
@@ -540,14 +540,14 @@ export default function AdminClients() {
 
     return (
       <div>
-        <p style={{ fontSize: 12, color: '#78716C', marginBottom: 16 }}>Alert subscribers from this organization. Manage subscriptions in the Alerts page.</p>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>Alert subscribers from this organization. Manage subscriptions in the Alerts page.</p>
         {subs.length === 0 ? (
-          <p style={{ fontSize: 13, color: '#A8A29E', textAlign: 'center', padding: '24px 0' }}>No alert subscribers for this organization's stations.</p>
+          <p style={{ fontSize: 13, color: 'var(--text-faint)', textAlign: 'center', padding: '24px 0' }}>No alert subscribers for this organization's stations.</p>
         ) : subs.map(s => (
           <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.25)', border: '1px solid rgba(255,255,255,0.4)', marginBottom: 8 }}>
             <div style={{ flex: 1 }}>
               <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>{s.name || s.email}</p>
-              <p style={{ fontSize: 11, color: '#78716C', margin: '2px 0 0' }}>{s.email} · {s.stations?.name || 'All stations'}</p>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '2px 0 0' }}>{s.email} · {s.stations?.name || 'All stations'}</p>
             </div>
             <Badge color={s.email_enabled ? 'green' : 'gray'}>{s.email_enabled ? 'Email On' : 'Email Off'}</Badge>
           </div>
@@ -566,7 +566,7 @@ export default function AdminClients() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
         <div>
           <h1 style={{ fontSize: isMobile ? 22 : 26, fontWeight: 800, letterSpacing: '-0.03em', margin: 0 }}>Manage Clients</h1>
-          <p style={{ fontSize: 13, color: '#78716C', marginTop: 4 }}>{orgs.length} organizations</p>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>{orgs.length} organizations</p>
         </div>
         <Btn onClick={() => setShowAddModal(true)} variant="primary"><Plus size={14} /> Add Organization</Btn>
       </div>
@@ -584,17 +584,17 @@ export default function AdminClients() {
           {loading ? (
             <div style={{ textAlign: 'center', padding: '24px 0' }}><Loader2 size={20} color="#A8A29E" style={{ animation: 'spin 1s linear infinite' }} /></div>
           ) : filteredOrgs.length === 0 ? (
-            <p style={{ fontSize: 13, color: '#A8A29E', textAlign: 'center', padding: '20px 0' }}>No organizations found.</p>
+            <p style={{ fontSize: 13, color: 'var(--text-faint)', textAlign: 'center', padding: '20px 0' }}>No organizations found.</p>
           ) : filteredOrgs.map(org => (
             <button key={org.id} onClick={() => loadOrgDetail(org)} style={{ width: '100%', padding: '12px', borderRadius: 12, border: `1.5px solid ${selectedOrg?.id === org.id ? 'rgba(22,163,74,0.4)' : 'rgba(255,255,255,0.4)'}`, background: selectedOrg?.id === org.id ? 'rgba(22,163,74,0.08)' : 'rgba(255,255,255,0.25)', cursor: 'pointer', textAlign: 'left', marginBottom: 6, transition: 'all 0.15s' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#1C1917' }}>{org.name}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{org.name}</span>
                 <Badge color={org.is_active ? 'green' : 'gray'}>{org.is_active ? 'Active' : 'Inactive'}</Badge>
               </div>
-              <p style={{ fontSize: 11, color: '#78716C', margin: 0 }}>{org.contact_email || 'No email'}</p>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>{org.contact_email || 'No email'}</p>
               <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
-                <span style={{ fontSize: 11, color: '#A8A29E' }}>{org.stations_count || 0} stations</span>
-                <span style={{ fontSize: 11, color: '#A8A29E' }}>{org.users_count || 0} users</span>
+                <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{org.stations_count || 0} stations</span>
+                <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{org.users_count || 0} users</span>
               </div>
             </button>
           ))}
@@ -606,7 +606,7 @@ export default function AdminClients() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
               <div>
                 <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>{selectedOrg.name}</h2>
-                <p style={{ fontSize: 12, color: '#78716C', margin: '2px 0 0' }}>{selectedOrg.contact_email}</p>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '2px 0 0' }}>{selectedOrg.contact_email}</p>
               </div>
               <Badge color={selectedOrg.is_active ? 'green' : 'gray'}>● {selectedOrg.is_active ? 'Active' : 'Inactive'}</Badge>
             </div>
@@ -632,7 +632,7 @@ export default function AdminClients() {
         ) : (
           <div style={{ ...glass({ padding: '40px' }), flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', animation: 'glassIn 0.4s ease both' }}>
             <Building2 size={40} color="#D6D3D1" style={{ marginBottom: 12 }} />
-            <p style={{ fontSize: 14, color: '#A8A29E', fontWeight: 500 }}>Select an organization to view details</p>
+            <p style={{ fontSize: 14, color: 'var(--text-faint)', fontWeight: 500 }}>Select an organization to view details</p>
           </div>
         )}
       </div>
@@ -643,7 +643,7 @@ export default function AdminClients() {
           <div style={{ ...glass({ padding: '28px' }), maxWidth: 520, width: '100%', animation: 'glassIn 0.25s ease both', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <h3 style={{ fontSize: 17, fontWeight: 800, margin: 0 }}>Add Organization</h3>
-              <button onClick={() => setShowAddModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#A8A29E' }}><X size={18} /></button>
+              <button onClick={() => setShowAddModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)' }}><X size={18} /></button>
             </div>
 
             <Field label="Organization Name *"><Input value={newOrg.name} onChange={v => setNewOrg(n => ({ ...n, name: v }))} placeholder="e.g. NEOM, MAADEN" /></Field>
@@ -661,7 +661,7 @@ export default function AdminClients() {
                 {allStations.map(s => {
                   const sel = newOrgStations.includes(s.id);
                   return (
-                    <button key={s.id} onClick={() => setNewOrgStations(ss => sel ? ss.filter(id => id !== s.id) : [...ss, s.id])} style={{ padding: '5px 10px', borderRadius: 8, border: `1.5px solid ${sel ? '#16A34A' : 'rgba(0,0,0,0.12)'}`, background: sel ? 'rgba(22,163,74,0.10)' : 'rgba(0,0,0,0.03)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)', color: sel ? '#16A34A' : '#78716C' }}>
+                    <button key={s.id} onClick={() => setNewOrgStations(ss => sel ? ss.filter(id => id !== s.id) : [...ss, s.id])} style={{ padding: '5px 10px', borderRadius: 8, border: `1.5px solid ${sel ? '#16A34A' : 'rgba(0,0,0,0.12)'}`, background: sel ? 'rgba(22,163,74,0.10)' : 'rgba(0,0,0,0.03)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)', color: sel ? '#16A34A' : 'var(--text-muted)' }}>
                       {sel && <Check size={11} style={{ marginRight: 4 }} />}{s.name}
                     </button>
                   );
@@ -685,7 +685,7 @@ export default function AdminClients() {
               <AlertTriangle size={20} color="#DC2626" />
               <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Delete Organization</h3>
             </div>
-            <p style={{ fontSize: 13, color: '#57534E', marginBottom: 20, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 13, color: 'var(--text-mid)', marginBottom: 20, lineHeight: 1.5 }}>
               This will permanently remove <strong>{selectedOrg?.name}</strong>, all its users, station assignments, and permissions. This cannot be undone.
             </p>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>

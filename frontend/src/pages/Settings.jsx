@@ -54,9 +54,9 @@ function SectionCard({ title, icon: Icon, children, fullWidth = false, style = {
 function Field({ label, hint, children }) {
   return (
     <div style={{ marginBottom: 16 }}>
-      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#57534E', marginBottom: 5, letterSpacing: '0.02em' }}>{label}</label>
+      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-mid)', marginBottom: 5, letterSpacing: '0.02em' }}>{label}</label>
       {children}
-      {hint && <p style={{ fontSize: 11, color: '#A8A29E', marginTop: 4 }}>{hint}</p>}
+      {hint && <p style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 4 }}>{hint}</p>}
     </div>
   );
 }
@@ -78,12 +78,12 @@ function Input({ value, onChange, type = 'text', placeholder, readOnly, disabled
           padding: isPass ? '9px 36px 9px 12px' : '9px 12px',
           borderRadius: 10, border: '1px solid rgba(255,255,255,0.45)',
           background: readOnly || disabled ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.35)',
-          fontSize: 13, fontFamily: 'var(--font)', color: readOnly ? '#78716C' : '#1C1917',
+          fontSize: 13, fontFamily: 'var(--font)', color: readOnly ? 'var(--text-muted)' : 'var(--text)',
           outline: 'none', ...style,
         }}
       />
       {isPass && (
-        <button type="button" onClick={() => setShow(s => !s)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#A8A29E' }}>
+        <button type="button" onClick={() => setShow(s => !s)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text-faint)' }}>
           {show ? <EyeOff size={14} /> : <Eye size={14} />}
         </button>
       )}
@@ -98,7 +98,7 @@ function Select({ value, onChange, options, disabled }) {
         value={value ?? ''}
         onChange={e => onChange(e.target.value)}
         disabled={disabled}
-        style={{ width: '100%', padding: '9px 32px 9px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.35)', fontSize: 13, fontFamily: 'var(--font)', color: '#1C1917', outline: 'none', appearance: 'none' }}
+        style={{ width: '100%', padding: '9px 32px 9px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.35)', fontSize: 13, fontFamily: 'var(--font)', color: 'var(--text)', outline: 'none', appearance: 'none' }}
       >
         {options.map(o => <option key={o.value ?? o} value={o.value ?? o}>{o.label ?? o}</option>)}
       </select>
@@ -110,7 +110,7 @@ function Select({ value, onChange, options, disabled }) {
 function Toggle({ value, onChange, label }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
-      <span style={{ fontSize: 13, color: '#44403C' }}>{label}</span>
+      <span style={{ fontSize: 13, color: 'var(--text-mid)' }}>{label}</span>
       <button onClick={() => onChange(!value)} style={{ width: 40, height: 22, borderRadius: 11, border: 'none', background: value ? '#16A34A' : '#D6D3D1', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
         <span style={{ position: 'absolute', top: 3, left: value ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
       </button>
@@ -421,7 +421,7 @@ export default function Settings({ profile }) {
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: isMobile ? 22 : 26, fontWeight: 800, letterSpacing: '-0.03em', margin: 0 }}>Settings</h1>
-        <p style={{ fontSize: 13, color: '#78716C', marginTop: 4 }}>Platform configuration and preferences</p>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>Platform configuration and preferences</p>
       </div>
 
       <div style={grid}>
@@ -461,7 +461,7 @@ export default function Settings({ profile }) {
           <Field label="Email Provider">
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               {[['gmail', 'Gmail SMTP'], ['resend', 'Resend API'], ['custom', 'Custom SMTP']].map(([val, lbl]) => (
-                <button key={val} onClick={() => setEmailProvider(val)} style={{ padding: '7px 14px', borderRadius: 20, border: `1.5px solid ${emailProvider === val ? '#16A34A' : 'rgba(255,255,255,0.5)'}`, background: emailProvider === val ? 'rgba(22,163,74,0.10)' : 'rgba(255,255,255,0.25)', color: emailProvider === val ? '#16A34A' : '#57534E', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)', cursor: 'pointer' }}>
+                <button key={val} onClick={() => setEmailProvider(val)} style={{ padding: '7px 14px', borderRadius: 20, border: `1.5px solid ${emailProvider === val ? '#16A34A' : 'rgba(255,255,255,0.5)'}`, background: emailProvider === val ? 'rgba(22,163,74,0.10)' : 'rgba(255,255,255,0.25)', color: emailProvider === val ? '#16A34A' : 'var(--text-mid)', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)', cursor: 'pointer' }}>
                   {lbl}
                 </button>
               ))}
@@ -500,7 +500,7 @@ export default function Settings({ profile }) {
 
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 20 }}>
             <SaveBtn onClick={saveEmail} status={emailStatus} label="Save Configuration" />
-            <button onClick={testEmail} disabled={!emailSaved && !emailConfigured} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 16px', borderRadius: 10, border: 'none', background: (!emailSaved && !emailConfigured) ? 'rgba(0,0,0,0.05)' : 'rgba(59,130,246,0.10)', color: (!emailSaved && !emailConfigured) ? '#A8A29E' : '#3B82F6', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', cursor: (!emailSaved && !emailConfigured) ? 'default' : 'pointer' }}>
+            <button onClick={testEmail} disabled={!emailSaved && !emailConfigured} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 16px', borderRadius: 10, border: 'none', background: (!emailSaved && !emailConfigured) ? 'rgba(0,0,0,0.05)' : 'rgba(59,130,246,0.10)', color: (!emailSaved && !emailConfigured) ? 'var(--text-faint)' : '#3B82F6', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', cursor: (!emailSaved && !emailConfigured) ? 'default' : 'pointer' }}>
               <Mail size={14} /> Send Test
             </button>
           </div>
@@ -509,14 +509,14 @@ export default function Settings({ profile }) {
               {emailTestResult.ok ? '✓' : '✗'} {emailTestResult.msg}
             </p>
           )}
-          <p style={{ fontSize: 11, color: '#A8A29E', marginTop: 12 }}>Alert detection runs every 5 minutes regardless of email configuration.</p>
+          <p style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 12 }}>Alert detection runs every 5 minutes regardless of email configuration.</p>
         </SectionCard>
 
         {/* ── SECTION 3: Alert Preferences ─────────────────────────────────── */}
         <SectionCard title="Alert Preferences" icon={Bell}>
           <Field label={`Warning Threshold: ${prefs.warning_threshold}%`} hint="Alert me when pollutants reach this % of the NCEC limit">
             <input type="range" min={50} max={95} value={prefs.warning_threshold} onChange={e => setPrefs(p => ({ ...p, warning_threshold: +e.target.value }))} style={{ width: '100%', accentColor: '#16A34A' }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#A8A29E', marginTop: 2 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>
               <span>50%</span><span>95%</span>
             </div>
           </Field>
@@ -543,7 +543,7 @@ export default function Settings({ profile }) {
             <Field label="Backend URL">
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <Input value={BACKEND || '(not configured)'} readOnly style={{ flex: 1 }} />
-                <button onClick={copyUrl} style={{ padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.35)', cursor: 'pointer', color: '#57534E' }}>
+                <button onClick={copyUrl} style={{ padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.35)', cursor: 'pointer', color: 'var(--text-mid)' }}>
                   {copied ? <Check size={14} color="#16A34A" /> : <Copy size={14} />}
                 </button>
               </div>
@@ -551,7 +551,7 @@ export default function Settings({ profile }) {
             <Field label="API Status">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.25)', width: 'fit-content' }}>
                 {apiConnected === null ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : apiConnected ? <Wifi size={14} color="#16A34A" /> : <WifiOff size={14} color="#DC2626" />}
-                <span style={{ fontSize: 13, fontWeight: 600, color: apiConnected === null ? '#A8A29E' : apiConnected ? '#16A34A' : '#DC2626' }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: apiConnected === null ? 'var(--text-faint)' : apiConnected ? '#16A34A' : '#DC2626' }}>
                   {apiConnected === null ? 'Checking…' : apiConnected ? 'Connected' : 'Disconnected'}
                 </span>
               </div>
@@ -563,18 +563,18 @@ export default function Settings({ profile }) {
 
           <SectionCard title="WhatsApp Integration" icon={MessageSquare}>
             <div style={{ marginBottom: 12 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'rgba(0,0,0,0.06)', color: '#78716C', letterSpacing: '0.04em' }}>Coming Soon</span>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'rgba(0,0,0,0.06)', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>Coming Soon</span>
             </div>
             <Field label="WhatsApp Number" hint="Stored for future use — WhatsApp delivery not yet active">
               <Input placeholder="+966 5X XXX XXXX" disabled />
             </Field>
-            <p style={{ fontSize: 11, color: '#A8A29E' }}>WhatsApp alert delivery will be available in a future update.</p>
+            <p style={{ fontSize: 11, color: 'var(--text-faint)' }}>WhatsApp alert delivery will be available in a future update.</p>
           </SectionCard>
         </div>
 
         {/* ── SECTION 4: NCEC Standards — full width ───────────────────────── */}
         <SectionCard title="NCEC Threshold Configuration" icon={Shield} fullWidth>
-          <p style={{ fontSize: 12, color: '#78716C', marginBottom: 16, marginTop: -8 }}>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16, marginTop: -8 }}>
             Executive Regulation for Air Quality (Royal Decree M/165, Appendix 1). Custom overrides replace NCEC defaults for alert detection.
           </p>
           <div data-scroll-x style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
@@ -582,7 +582,7 @@ export default function Settings({ profile }) {
               <thead>
                 <tr>
                   {['Pollutant', 'Period', 'Unit', 'NCEC Default', 'Custom Override', 'Enabled'].map(h => (
-                    <th key={h} style={{ textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#78716C', padding: '6px 12px', borderBottom: '1px solid rgba(0,0,0,0.07)', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
+                    <th key={h} style={{ textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', padding: '6px 12px', borderBottom: '1px solid rgba(0,0,0,0.07)', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -592,9 +592,9 @@ export default function Settings({ profile }) {
                   return (
                     <tr key={def.key} style={{ background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.15)' }}>
                       <td style={{ padding: '8px 12px', fontSize: 13, fontWeight: 600 }}>{def.pollutant}</td>
-                      <td style={{ padding: '8px 12px', fontSize: 12, color: '#78716C' }}>{def.period}</td>
-                      <td style={{ padding: '8px 12px', fontSize: 12, color: '#A8A29E', fontFamily: 'var(--mono)' }}>{def.unit}</td>
-                      <td style={{ padding: '8px 12px', fontSize: 13, fontFamily: 'var(--mono)', color: '#57534E' }}>{def.ncec.toLocaleString()}</td>
+                      <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-muted)' }}>{def.period}</td>
+                      <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-faint)', fontFamily: 'var(--mono)' }}>{def.unit}</td>
+                      <td style={{ padding: '8px 12px', fontSize: 13, fontFamily: 'var(--mono)', color: 'var(--text-mid)' }}>{def.ncec.toLocaleString()}</td>
                       <td style={{ padding: '8px 12px' }}>
                         <input
                           type="number"
@@ -615,10 +615,10 @@ export default function Settings({ profile }) {
                 {ncecRules.filter(r => r.is_custom).map((r, i) => (
                   <tr key={r.id} style={{ background: 'rgba(59,130,246,0.04)' }}>
                     <td style={{ padding: '8px 12px', fontSize: 13, fontWeight: 600 }}>{r.pollutant.toUpperCase()} <span style={{ fontSize: 10, color: '#3B82F6', fontWeight: 700 }}>CUSTOM</span></td>
-                    <td style={{ padding: '8px 12px', fontSize: 12, color: '#78716C' }}>{r.period}</td>
-                    <td style={{ padding: '8px 12px', fontSize: 12, color: '#A8A29E', fontFamily: 'var(--mono)' }}>µg/m³</td>
-                    <td style={{ padding: '8px 12px', fontSize: 12, color: '#A8A29E' }}>—</td>
-                    <td style={{ padding: '8px 12px', fontSize: 13, fontFamily: 'var(--mono)', color: '#57534E' }}>{r.threshold}</td>
+                    <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-muted)' }}>{r.period}</td>
+                    <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-faint)', fontFamily: 'var(--mono)' }}>µg/m³</td>
+                    <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-faint)' }}>—</td>
+                    <td style={{ padding: '8px 12px', fontSize: 13, fontFamily: 'var(--mono)', color: 'var(--text-mid)' }}>{r.threshold}</td>
                     <td style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
                       <button onClick={() => handleNcecToggle({ dbPollutant: r.pollutant, dbPeriod: r.period }, !r.enabled)} style={{ width: 36, height: 20, borderRadius: 10, border: 'none', background: r.enabled ? '#16A34A' : '#D6D3D1', cursor: 'pointer', position: 'relative', transition: 'background 0.2s' }}>
                         <span style={{ position: 'absolute', top: 2, left: r.enabled ? 17 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
@@ -635,18 +635,18 @@ export default function Settings({ profile }) {
             <div style={{ marginTop: 16, padding: '14px 16px', borderRadius: 12, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)' }}>
               <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Add Custom Standard</p>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                <div><label style={{ fontSize: 11, fontWeight: 600, color: '#78716C', display: 'block', marginBottom: 4 }}>Pollutant</label><Input value={customRuleForm.pollutant} onChange={v => setCustomRuleForm(f => ({ ...f, pollutant: v }))} placeholder="e.g. pb" style={{ width: 90 }} /></div>
-                <div><label style={{ fontSize: 11, fontWeight: 600, color: '#78716C', display: 'block', marginBottom: 4 }}>Period</label><Input value={customRuleForm.period} onChange={v => setCustomRuleForm(f => ({ ...f, period: v }))} placeholder="24-hour" style={{ width: 100 }} /></div>
-                <div><label style={{ fontSize: 11, fontWeight: 600, color: '#78716C', display: 'block', marginBottom: 4 }}>Threshold</label><Input type="number" value={customRuleForm.threshold} onChange={v => setCustomRuleForm(f => ({ ...f, threshold: v }))} placeholder="0" style={{ width: 90 }} /></div>
+                <div><label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Pollutant</label><Input value={customRuleForm.pollutant} onChange={v => setCustomRuleForm(f => ({ ...f, pollutant: v }))} placeholder="e.g. pb" style={{ width: 90 }} /></div>
+                <div><label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Period</label><Input value={customRuleForm.period} onChange={v => setCustomRuleForm(f => ({ ...f, period: v }))} placeholder="24-hour" style={{ width: 100 }} /></div>
+                <div><label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Threshold</label><Input type="number" value={customRuleForm.threshold} onChange={v => setCustomRuleForm(f => ({ ...f, threshold: v }))} placeholder="0" style={{ width: 90 }} /></div>
                 <button onClick={addCustomRule} style={{ padding: '9px 14px', borderRadius: 10, border: 'none', background: 'rgba(22,163,74,0.12)', color: '#16A34A', fontSize: 12, fontWeight: 700, fontFamily: 'var(--font)', cursor: 'pointer' }}>Add</button>
-                <button onClick={() => setCustomRuleForm(f => ({ ...f, show: false }))} style={{ padding: '9px 10px', borderRadius: 10, border: 'none', background: 'rgba(0,0,0,0.06)', color: '#78716C', cursor: 'pointer' }}><X size={13} /></button>
+                <button onClick={() => setCustomRuleForm(f => ({ ...f, show: false }))} style={{ padding: '9px 10px', borderRadius: 10, border: 'none', background: 'rgba(0,0,0,0.06)', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={13} /></button>
               </div>
             </div>
           )}
 
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 18, alignItems: 'center' }}>
             <SaveBtn onClick={saveNcecAll} status={ncecStatus} />
-            <button onClick={resetNcecDefaults} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, border: 'none', background: 'rgba(0,0,0,0.05)', color: '#57534E', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)', cursor: 'pointer' }}>
+            <button onClick={resetNcecDefaults} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, border: 'none', background: 'rgba(0,0,0,0.05)', color: 'var(--text-mid)', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)', cursor: 'pointer' }}>
               <RefreshCw size={13} /> Reset to NCEC Defaults
             </button>
             <button onClick={() => setCustomRuleForm(f => ({ ...f, show: true }))} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, border: 'none', background: 'rgba(59,130,246,0.10)', color: '#3B82F6', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)', cursor: 'pointer' }}>
@@ -665,9 +665,9 @@ export default function Settings({ profile }) {
               { label: 'Est. Storage', value: dataStats ? `~${Math.round(dataStats.count * 0.5 / 1024)} MB` : '—', sub: '~0.5 KB/row' },
             ].map(s => (
               <div key={s.label} style={{ ...glassInner(), padding: '12px 14px', borderRadius: 12 }}>
-                <p style={{ fontSize: 11, color: '#A8A29E', fontWeight: 600, marginBottom: 4 }}>{s.label}</p>
+                <p style={{ fontSize: 11, color: 'var(--text-faint)', fontWeight: 600, marginBottom: 4 }}>{s.label}</p>
                 <p style={{ fontSize: 18, fontWeight: 800, fontFamily: 'var(--mono)', margin: 0 }}>{s.value}</p>
-                {s.sub && <p style={{ fontSize: 10, color: '#A8A29E', marginTop: 2 }}>{s.sub}</p>}
+                {s.sub && <p style={{ fontSize: 10, color: 'var(--text-faint)', marginTop: 2 }}>{s.sub}</p>}
               </div>
             ))}
           </div>
@@ -676,7 +676,7 @@ export default function Settings({ profile }) {
             {/* Export */}
             <div style={{ padding: '16px', borderRadius: 14, background: 'rgba(255,255,255,0.20)', border: '1px solid rgba(255,255,255,0.35)' }}>
               <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Export All Data</p>
-              <p style={{ fontSize: 12, color: '#78716C', marginBottom: 12 }}>Download all readings as a CSV file.</p>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>Download all readings as a CSV file.</p>
               <button onClick={exportAllData} disabled={exportLoading} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 16px', borderRadius: 10, border: 'none', background: 'rgba(22,163,74,0.12)', color: '#16A34A', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', cursor: exportLoading ? 'default' : 'pointer' }}>
                 {exportLoading ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={14} />}
                 {exportLoading ? 'Exporting…' : 'Export CSV'}
@@ -686,7 +686,7 @@ export default function Settings({ profile }) {
             {/* Clear old data */}
             <div style={{ padding: '16px', borderRadius: 14, background: 'rgba(220,38,38,0.04)', border: '1px solid rgba(220,38,38,0.12)' }}>
               <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 6, color: '#DC2626' }}>Clear Old Data</p>
-              <p style={{ fontSize: 12, color: '#78716C', marginBottom: 10 }}>Permanently delete readings older than:</p>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>Permanently delete readings older than:</p>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                 <Select value={clearMonths} onChange={setClearMonths} options={[{ value: '6', label: '6 months' }, { value: '12', label: '1 year' }, { value: '24', label: '2 years' }]} />
                 <button onClick={() => setClearModal(true)} disabled={clearLoading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, border: 'none', background: 'rgba(220,38,38,0.10)', color: '#DC2626', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)', cursor: 'pointer' }}>
@@ -700,7 +700,7 @@ export default function Settings({ profile }) {
           {/* Backfill */}
           <div style={{ marginTop: 20, padding: '16px', borderRadius: 14, background: 'rgba(255,255,255,0.20)', border: '1px solid rgba(255,255,255,0.35)' }}>
             <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Backfill Historical Data</p>
-            <p style={{ fontSize: 12, color: '#78716C', marginBottom: 12 }}>Fetch historical readings from the EnggEnv API and store them in the database.</p>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>Fetch historical readings from the EnggEnv API and store them in the database.</p>
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
               <Field label="Station">
                 <Select value={bf.stationId} onChange={v => setBf(b => ({ ...b, stationId: v }))} options={[{ value: '', label: 'Select station…' }, ...stations.map(s => ({ value: s.id, label: s.name }))]} />
@@ -712,14 +712,14 @@ export default function Settings({ profile }) {
                 <input type="date" value={bf.toDate} onChange={e => setBf(b => ({ ...b, toDate: e.target.value }))} style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.35)', fontSize: 13, fontFamily: 'var(--font)', outline: 'none', boxSizing: 'border-box' }} />
               </Field>
             </div>
-            <button onClick={startBackfill} disabled={!bf.stationId || !bf.fromDate || bf.loading} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', borderRadius: 10, border: 'none', background: (!bf.stationId || !bf.fromDate) ? 'rgba(0,0,0,0.05)' : 'rgba(22,163,74,0.12)', color: (!bf.stationId || !bf.fromDate) ? '#A8A29E' : '#16A34A', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', cursor: (!bf.stationId || !bf.fromDate || bf.loading) ? 'default' : 'pointer' }}>
+            <button onClick={startBackfill} disabled={!bf.stationId || !bf.fromDate || bf.loading} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', borderRadius: 10, border: 'none', background: (!bf.stationId || !bf.fromDate) ? 'rgba(0,0,0,0.05)' : 'rgba(22,163,74,0.12)', color: (!bf.stationId || !bf.fromDate) ? 'var(--text-faint)' : '#16A34A', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', cursor: (!bf.stationId || !bf.fromDate || bf.loading) ? 'default' : 'pointer' }}>
               {bf.loading ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <RefreshCw size={14} />}
               {bf.loading ? 'Running Backfill…' : 'Start Backfill'}
             </button>
             {bf.result && !bf.result.error && (
               <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 10, background: 'rgba(22,163,74,0.08)', border: '1px solid rgba(22,163,74,0.20)' }}>
                 <p style={{ fontSize: 12, fontWeight: 700, color: '#16A34A', margin: '0 0 4px' }}>✓ Backfill complete: {bf.result.imported?.toLocaleString()} readings imported</p>
-                <p style={{ fontSize: 11, color: '#78716C', margin: 0 }}>{bf.result.from_date} → {bf.result.to_date} · {bf.result.errors} errors</p>
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>{bf.result.from_date} → {bf.result.to_date} · {bf.result.errors} errors</p>
               </div>
             )}
             {bf.result?.error && <p style={{ fontSize: 12, color: '#DC2626', marginTop: 8, fontWeight: 600 }}>✗ {bf.result.error}</p>}
@@ -746,7 +746,7 @@ export default function Settings({ profile }) {
           </Field>
 
           {/* Change password */}
-          <button onClick={() => setPwForm(f => ({ ...f, show: !f.show }))} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 10, border: 'none', background: 'rgba(0,0,0,0.05)', color: '#57534E', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)', cursor: 'pointer', marginBottom: pwForm.show ? 12 : 0 }}>
+          <button onClick={() => setPwForm(f => ({ ...f, show: !f.show }))} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 10, border: 'none', background: 'rgba(0,0,0,0.05)', color: 'var(--text-mid)', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)', cursor: 'pointer', marginBottom: pwForm.show ? 12 : 0 }}>
             <Shield size={13} /> {pwForm.show ? 'Cancel' : 'Change Password'}
           </button>
 
@@ -780,11 +780,11 @@ export default function Settings({ profile }) {
               <AlertTriangle size={20} color="#DC2626" />
               <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Confirm Deletion</h3>
             </div>
-            <p style={{ fontSize: 13, color: '#57534E', marginBottom: 20, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 13, color: 'var(--text-mid)', marginBottom: 20, lineHeight: 1.5 }}>
               This will permanently delete all readings older than <strong>{clearMonths === '6' ? '6 months' : clearMonths === '12' ? '1 year' : '2 years'}</strong>. This action cannot be undone.
             </p>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-              <button onClick={() => setClearModal(false)} style={{ padding: '9px 18px', borderRadius: 10, border: 'none', background: 'rgba(0,0,0,0.07)', color: '#57534E', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => setClearModal(false)} style={{ padding: '9px 18px', borderRadius: 10, border: 'none', background: 'rgba(0,0,0,0.07)', color: 'var(--text-mid)', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', cursor: 'pointer' }}>Cancel</button>
               <button onClick={clearOldData} style={{ padding: '9px 18px', borderRadius: 10, border: 'none', background: 'rgba(220,38,38,0.12)', color: '#DC2626', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', cursor: 'pointer' }}>Delete</button>
             </div>
           </div>
