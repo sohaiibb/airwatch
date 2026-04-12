@@ -421,6 +421,28 @@ def trigger_alert_check():
     return {"ok": True, "message": "Alert check started"}
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Generic Settings API
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/settings")
+def get_all_settings():
+    require_sb()
+    rows = sb.table("system_settings").select("key,value").execute()
+    return {r["key"]: r["value"] for r in (rows.data or [])}
+
+@app.get("/api/settings/{key}")
+def get_setting(key: str):
+    require_sb()
+    res = sb.table("system_settings").select("value").eq("key", key).single().execute()
+    return res.data["value"] if res.data else {}
+
+@app.put("/api/settings/{key}")
+async def put_setting(key: str, body: dict):
+    require_sb()
+    sb.table("system_settings").upsert({"key": key, "value": body}).execute()
+    return {"ok": True}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Backfill endpoint
 # ─────────────────────────────────────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase, getProfile } from './lib/supabase';
 import { glass, glassInner } from './lib/utils';
-import { LayoutDashboard, BarChart3, FileText, Bell, Settings, LogOut, Wind, ChevronRight, Shield, Users, Radio, Loader2, Compass, Database, Menu } from 'lucide-react';
+import { LayoutDashboard, BarChart3, FileText, Bell, Settings as SettingsIcon, LogOut, Wind, ChevronRight, Shield, Users, Radio, Loader2, Compass, Database, Menu } from 'lucide-react';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Charts from './pages/Charts';
@@ -11,6 +11,7 @@ import AdminStations from './pages/AdminStations';
 import Reports from './pages/Reports';
 import DataTable from './pages/DataTable';
 import Alerts from './pages/Alerts';
+import Settings from './pages/Settings';
 
 const NAV_CLIENT = [
   { id: 'dashboard',  label: 'Dashboard',  icon: LayoutDashboard },
@@ -20,7 +21,7 @@ const NAV_CLIENT = [
   { id: 'wind-rose',  label: 'Wind Rose',  icon: Compass },
   { id: 'reports',    label: 'Reports',    icon: FileText },
   { id: 'alerts',     label: 'Alerts',     icon: Bell },
-  { id: 'settings',   label: 'Settings',   icon: Settings },
+  { id: 'settings',   label: 'Settings',   icon: SettingsIcon },
 ];
 const NAV_ADMIN = [
   { id: 'admin-stations', label: 'Manage Stations', icon: Radio },
@@ -121,7 +122,7 @@ export default function App() {
       case 'data':    return <DataTable profile={profile} />;
       case 'reports': return <Reports profile={profile} />;
       case 'alerts': return <Alerts profile={profile} />;
-      case 'settings': return <Placeholder title="Settings" desc="Coming in Phase 2." icon={Settings} />;
+      case 'settings': return <Settings profile={profile} />;
       case 'admin-clients': return <Placeholder title="Manage Clients" desc="Coming in Phase 2." icon={Users} />;
       case 'admin-settings': return <Placeholder title="System Settings" desc="Coming in Phase 2." icon={Shield} />;
       default: return <Dashboard profile={profile} />;
