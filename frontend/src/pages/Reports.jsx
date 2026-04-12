@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import { applyPlugin } from 'jspdf-autotable';
 applyPlugin(jsPDF);
-import { getStations, getReadingsByDateRange } from '../lib/supabase';
+import { supabase, getStations } from '../lib/supabase';
 import { glass, glassInner, generateDemoHistory } from '../lib/utils';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -685,6 +685,7 @@ export default function Reports({ profile }) {
   const [avgPeriod,       setAvgPeriod]      = useState('1hour');
   const [selectedParams,  setSelectedParams] = useState(new Set(COLS.map(c => c.key)));
   const [loading,         setLoading]        = useState(false);
+  const [loadingCount,    setLoadingCount]   = useState(0);
   const [error,           setError]          = useState('');
   const [report,          setReport]         = useState(null);
   const [recentReports,   setRecentReports]  = useState([]);
@@ -728,6 +729,7 @@ export default function Reports({ profile }) {
     if (new Date(toDTVal) <= new Date(fromDTVal)) { setError('"To" must be after "From".'); return null; }
     setError('');
     setLoading(true);
+    setLoadingCount(0);
     let readings;
     try {
       const isDemo = stationId.startsWith('demo-');
@@ -735,7 +737,27 @@ export default function Reports({ profile }) {
         const hours = Math.max(1, Math.ceil((new Date(toDTVal) - new Date(fromDTVal)) / 3600000));
         readings = generateDemoHistory(Math.min(hours, 720));
       } else {
-        readings = await getReadingsByDateRange(stationId, fromISO, toISO);
+        // Chunked fetch — PostgREST caps at 1,000 rows per request.
+        // Loop with .range() until we get fewer than CHUNK rows (means we're done).
+        const CHUNK = 1000;
+        let all = [], offset = 0;
+        while (true) {
+          const { data, error: fetchErr } = await supabase
+            .from('readings')
+            .select('*')
+            .eq('station_id', stationId)
+            .gte('timestamp', fromISO)
+            .lte('timestamp', toISO)
+            .order('timestamp', { ascending: true })
+            .range(offset, offset + CHUNK - 1);
+          if (fetchErr) throw new Error(fetchErr.message);
+          if (!data || data.length === 0) break;
+          all = all.concat(data);
+          setLoadingCount(all.length);
+          if (data.length < CHUNK) break;
+          offset += CHUNK;
+        }
+        readings = all;
       }
     } catch (e) {
       console.error(e);
@@ -973,7 +995,7 @@ export default function Reports({ profile }) {
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <button onClick={handlePreview} disabled={loading} style={actionBtn(true)}>
             {loading ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Eye size={14} />}
-            {loading ? 'Loading…' : 'Preview Report'}
+            {loading ? `Loading… ${loadingCount > 0 ? loadingCount.toLocaleString() + ' rows' : ''}` : 'Preview Report'}
           </button>
 
           <div style={{ width: 1, height: 28, background: 'rgba(255,255,255,0.4)', margin: '0 4px' }} />
