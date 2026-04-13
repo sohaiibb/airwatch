@@ -1,12 +1,16 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, ReferenceLine, ComposedChart, Scatter, Line as RLine,
+  Tooltip, Legend, ResponsiveContainer, ReferenceLine, ReferenceArea,
+  ComposedChart, Scatter, Line as RLine,
 } from 'recharts';
-import { Activity, AlertTriangle, TrendingUp, TrendingDown, Download, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Search, GitBranch } from 'lucide-react';
+import {
+  Activity, AlertTriangle, TrendingUp, TrendingDown, Download,
+  ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Search, GitBranch,
+} from 'lucide-react';
 import { getStations, getDemoStations, getDemoHistory, getDemoDaily, getDemoReadings } from '../lib/supabase';
-import { glass, glassInner, getAqiLevel, POLLUTANTS, formatTime, formatDate } from '../lib/utils';
+import { glass, glassInner, getAqiLevel, POLLUTANTS, NCEC_STANDARDS, formatTime, formatDate } from '../lib/utils';
 
 const PAGE_SIZE = 20;
 
@@ -69,6 +73,53 @@ function fmtTs(ts) {
   });
 }
 
+// ─── Pub-chart date formatter ───
+function fmtPubDate(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+function fmtAxisTs(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return `${d.getDate()} ${d.toLocaleString('en', { month: 'short' })} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+// ─── Filename builder ───
+function buildExportFilename(tag, stationName, fromTs, toTs, ext) {
+  const sn = (stationName || 'Station').replace(/\s+/g, '');
+  const from = fromTs ? new Date(fromTs).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '') : 'From';
+  const to   = toTs   ? new Date(toTs).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '') : 'To';
+  const suffix = ext === 'png' ? '_300dpi' : '';
+  return `AirWatch_${tag}_${sn}_${from}_${to}${suffix}.${ext}`;
+}
+
+// ─── Run html2canvas + download ───
+async function captureAndDownload(el, filename, format) {
+  if (format === 'svg') {
+    const svgEl = el.querySelector('svg');
+    if (!svgEl) return;
+    const clone = svgEl.cloneNode(true);
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    const str = new XMLSerializer().serializeToString(clone);
+    const blob = new Blob([str], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.download = filename; a.href = url; a.click();
+    URL.revokeObjectURL(url);
+    return;
+  }
+  const h2c = (await import('html2canvas')).default;
+  const canvas = await h2c(el, { scale: 3, backgroundColor: '#ffffff', useCORS: true, logging: false });
+  if (format === 'png') {
+    const a = document.createElement('a'); a.download = filename; a.href = canvas.toDataURL('image/png'); a.click();
+  } else {
+    const { jsPDF } = await import('jspdf');
+    const pw = canvas.width / 3, ph = canvas.height / 3;
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [pw, ph] });
+    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pw, ph);
+    pdf.save(filename);
+  }
+}
+
 // ─── Glass Tooltip ───
 const GlassTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
@@ -84,29 +135,315 @@ const GlassTooltip = ({ active, payload, label }) => {
   );
 };
 
-// ─── Single Gas Chart Card ───
-function GasChart({ pollutant, data }) {
-  const { key, name, unit, color, threshold } = pollutant;
+// ─── Publication chart content — single pollutant ───
+function PubChartContent({ pollutant, data, stationName, showNcec, ncecLimit, ncecLabel }) {
+  const { key, name, unit, color } = pollutant;
+  const fromTs = data[0]?.timestamp;
+  const toTs   = data[data.length - 1]?.timestamp;
+  const dateRange = `Period: ${fmtPubDate(fromTs)} — ${fmtPubDate(toTs)}`;
+  const showDots = data.length < 100;
   const values = data.map(d => d[key]).filter(v => v != null);
-  const current = values.length ? values[values.length - 1] : null;
-  const avg = values.length ? (values.reduce((a, b) => a + b, 0) / values.length) : null;
-  const min = values.length ? Math.min(...values) : null;
-  const maxVal = values.length ? Math.max(...values) : null;
-  const over = current != null && current > threshold;
-  const prevAvg = values.length > 4 ? values.slice(0, Math.floor(values.length / 2)).reduce((a, b) => a + b, 0) / Math.floor(values.length / 2) : null;
-  const trend = avg && prevAvg ? (avg > prevAvg ? 'up' : 'down') : null;
-  const trendPct = avg && prevAvg ? Math.abs(((avg - prevAvg) / prevAvg) * 100).toFixed(0) : null;
+  const rawMax = values.length ? Math.max(...values) : 0;
+  const yMax = Math.max(rawMax, ncecLimit || 0) * 1.22;
+  const chartData = data.map(d => ({ ...d, axisTime: fmtAxisTs(d.timestamp) }));
 
   return (
-    <div style={{ ...glass({ padding: '18px 20px' }), animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) both' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+    <div style={{ background: '#fff', fontFamily: 'Arial, sans-serif' }}>
+      <div style={{ textAlign: 'center', borderBottom: '1.5px solid #ccc', paddingBottom: 10, marginBottom: 10 }}>
+        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 18, fontWeight: 'bold', margin: '0 0 3px', color: '#111' }}>
+          {name} Concentration — {stationName}
+        </h2>
+        <p style={{ fontSize: 11, color: '#555', margin: 0, fontStyle: 'italic' }}>{dateRange}</p>
+      </div>
+      <div style={{ height: 400 }}>
+        <ResponsiveContainer width="100%" height={400}>
+          <LineChart data={chartData} margin={{ top: 10, right: 100, bottom: 55, left: 80 }}>
+            <CartesianGrid strokeDasharray="4 4" stroke="#d8d8d8" />
+            <XAxis dataKey="axisTime"
+              tick={{ fill: '#444', fontSize: 9, fontFamily: 'Arial' }}
+              axisLine={{ stroke: '#444', strokeWidth: 1.5 }} tickLine={{ stroke: '#444' }}
+              label={{ value: 'Date / Time (GMT+3)', position: 'insideBottom', offset: -38, fill: '#222', fontSize: 11, fontWeight: 'bold', fontFamily: 'Arial' }}
+              interval="preserveStartEnd" />
+            <YAxis
+              tick={{ fill: '#444', fontSize: 9, fontFamily: 'Arial' }}
+              axisLine={{ stroke: '#444', strokeWidth: 1.5 }} tickLine={{ stroke: '#444' }}
+              label={{ value: `Concentration (${unit})`, angle: -90, position: 'insideLeft', offset: -62, fill: '#222', fontSize: 11, fontWeight: 'bold', fontFamily: 'Arial' }}
+              domain={[0, yMax > 0 ? Math.ceil(yMax) : 'auto']} />
+            {showNcec && ncecLimit != null && yMax > 0 && (
+              <ReferenceArea y1={ncecLimit} y2={Math.ceil(yMax)} fill="rgba(220,38,38,0.07)" />
+            )}
+            {showNcec && ncecLimit != null && (
+              <ReferenceLine y={ncecLimit} stroke="#DC2626" strokeDasharray="6 3" strokeWidth={1.5}
+                label={{ value: ncecLabel, position: 'right', fill: '#DC2626', fontSize: 9, fontFamily: 'Arial' }} />
+            )}
+            <Line type="monotone" dataKey={key} stroke={color} strokeWidth={1.5}
+              dot={showDots ? { r: 2, fill: color, stroke: 'none' } : false}
+              name={`${name} Measured`} isAnimationActive={false} />
+            <Legend wrapperStyle={{ fontFamily: 'Arial', fontSize: 10, paddingTop: 6 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 10, color: '#888', borderTop: '1px solid #ddd', paddingTop: 6 }}>
+        <span>Hills and Field AirWatch Monitoring Dashboard</span>
+        <span>Station: {stationName} | Generated: {new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Publication chart — multi-overlay ───
+function PubOverlayContent({ activePollutants, data, stationName }) {
+  const fromTs = data[0]?.timestamp, toTs = data[data.length - 1]?.timestamp;
+  const chartData = data.map(d => ({ ...d, axisTime: fmtAxisTs(d.timestamp) }));
+  return (
+    <div style={{ background: '#fff', fontFamily: 'Arial, sans-serif' }}>
+      <div style={{ textAlign: 'center', borderBottom: '1.5px solid #ccc', paddingBottom: 10, marginBottom: 10 }}>
+        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 18, fontWeight: 'bold', margin: '0 0 3px', color: '#111' }}>
+          Multi-Pollutant Overlay — {stationName}
+        </h2>
+        <p style={{ fontSize: 11, color: '#555', margin: 0, fontStyle: 'italic' }}>Period: {fmtPubDate(fromTs)} — {fmtPubDate(toTs)}</p>
+      </div>
+      <div style={{ height: 420 }}>
+        <ResponsiveContainer width="100%" height={420}>
+          <LineChart data={chartData} margin={{ top: 10, right: 30, bottom: 55, left: 80 }}>
+            <CartesianGrid strokeDasharray="4 4" stroke="#d8d8d8" />
+            <XAxis dataKey="axisTime"
+              tick={{ fill: '#444', fontSize: 9, fontFamily: 'Arial' }}
+              axisLine={{ stroke: '#444', strokeWidth: 1.5 }} tickLine={{ stroke: '#444' }}
+              label={{ value: 'Date / Time (GMT+3)', position: 'insideBottom', offset: -38, fill: '#222', fontSize: 11, fontWeight: 'bold', fontFamily: 'Arial' }}
+              interval="preserveStartEnd" />
+            <YAxis
+              tick={{ fill: '#444', fontSize: 9, fontFamily: 'Arial' }}
+              axisLine={{ stroke: '#444', strokeWidth: 1.5 }} tickLine={{ stroke: '#444' }}
+              label={{ value: 'Concentration (µg/m³)', angle: -90, position: 'insideLeft', offset: -62, fill: '#222', fontSize: 11, fontWeight: 'bold', fontFamily: 'Arial' }} />
+            {activePollutants.map(p => (
+              <Line key={p.key} type="monotone" dataKey={p.key} stroke={p.color} strokeWidth={1.5}
+                dot={false} name={p.name} isAnimationActive={false} />
+            ))}
+            <Legend wrapperStyle={{ fontFamily: 'Arial', fontSize: 10, paddingTop: 6 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 10, color: '#888', borderTop: '1px solid #ddd', paddingTop: 6 }}>
+        <span>Hills and Field AirWatch Monitoring Dashboard</span>
+        <span>Station: {stationName} | Generated: {new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Publication chart — correlation scatter ───
+function PubCorrContent({ xParam, yParam, points, trendData, rValue, stationName }) {
+  const CustomPubDot = (props) => {
+    const { cx, cy, payload } = props;
+    const c = payload.aqi == null ? '#94a3b8'
+      : payload.aqi <= 50 ? '#16A34A'
+      : payload.aqi <= 100 ? '#CA8A04'
+      : payload.aqi <= 150 ? '#EA580C'
+      : payload.aqi <= 200 ? '#DC2626' : '#7C3AED';
+    return <circle cx={cx} cy={cy} r={3} fill={c} fillOpacity={0.75} stroke="none" />;
+  };
+  return (
+    <div style={{ background: '#fff', fontFamily: 'Arial, sans-serif' }}>
+      <div style={{ textAlign: 'center', borderBottom: '1.5px solid #ccc', paddingBottom: 10, marginBottom: 10 }}>
+        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 18, fontWeight: 'bold', margin: '0 0 3px', color: '#111' }}>
+          Pollutant Correlation: {xParam.name} vs {yParam.name} — {stationName}
+        </h2>
+        <p style={{ fontSize: 11, color: '#555', margin: 0, fontStyle: 'italic' }}>
+          Pearson R = {rValue.toFixed(3)} · {rInterpret(rValue)}
+        </p>
+      </div>
+      <div style={{ height: 420 }}>
+        <ResponsiveContainer width="100%" height={420}>
+          <ComposedChart margin={{ top: 10, right: 30, bottom: 60, left: 80 }}>
+            <CartesianGrid strokeDasharray="4 4" stroke="#d8d8d8" />
+            <XAxis dataKey="x" type="number" domain={['auto','auto']} name={xParam.name}
+              tick={{ fill: '#444', fontSize: 9, fontFamily: 'Arial' }}
+              axisLine={{ stroke: '#444', strokeWidth: 1.5 }} tickLine={{ stroke: '#444' }}
+              label={{ value: `${xParam.name} (${xParam.unit})`, position: 'insideBottom', offset: -38, fill: '#222', fontSize: 11, fontWeight: 'bold', fontFamily: 'Arial' }} />
+            <YAxis dataKey="y" type="number" domain={['auto','auto']} name={yParam.name}
+              tick={{ fill: '#444', fontSize: 9, fontFamily: 'Arial' }}
+              axisLine={{ stroke: '#444', strokeWidth: 1.5 }} tickLine={{ stroke: '#444' }}
+              label={{ value: `${yParam.name} (${yParam.unit})`, angle: -90, position: 'insideLeft', offset: -62, fill: '#222', fontSize: 11, fontWeight: 'bold', fontFamily: 'Arial' }} />
+            <Scatter data={points} shape={<CustomPubDot />} />
+            {trendData.length === 2 && (
+              <RLine data={trendData} dataKey="y" dot={false} stroke="#0d9488" strokeWidth={1.5} strokeDasharray="6 3" type="linear" isAnimationActive={false} name="Trend" />
+            )}
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+      <div style={{ display: 'flex', gap: 14, marginTop: 4, flexWrap: 'wrap', fontSize: 10, color: '#555', borderTop: '1px solid #ddd', paddingTop: 6 }}>
+        <span style={{ fontWeight: 600, color: '#888' }}>Dot color = AQI:</span>
+        {[['#16A34A','Good (0-50)'],['#CA8A04','Moderate'],['#EA580C','USG'],['#DC2626','Unhealthy'],['#7C3AED','Very Unhealthy'],['#94a3b8','Unknown']].map(([c,l]) => (
+          <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: c, display: 'inline-block' }} />{l}
+          </span>
+        ))}
+        <span style={{ marginLeft: 'auto', color: '#888' }}>Hills and Field AirWatch | Generated: {new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Download dropdown + export hook ───
+function useChartExport() {
+  const [dlOpen, setDlOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportFmt, setExportFmt] = useState(null);
+  const pubRef = useRef(null);
+
+  function triggerExport(fmt) {
+    setDlOpen(false);
+    setExportFmt(fmt);
+    setExporting(true);
+  }
+
+  useEffect(() => {
+    if (!exporting || !pubRef.current) return;
+    let alive = true;
+    const timer = setTimeout(async () => {
+      if (!alive) return;
+      try {
+        // filename is read from the pubRef's data-filename attribute
+        const filename = pubRef.current?.dataset?.filename || 'AirWatch_export';
+        await captureAndDownload(pubRef.current, filename, exportFmt);
+      } finally {
+        if (alive) setExporting(false);
+      }
+    }, 320);
+    return () => { alive = false; clearTimeout(timer); };
+  }, [exporting]);
+
+  return { dlOpen, setDlOpen, exporting, triggerExport, pubRef };
+}
+
+// ─── Download button UI ───
+function DlButton({ dlOpen, setDlOpen, triggerExport, exporting, label = 'Export' }) {
+  return (
+    <div style={{ position: 'relative' }}>
+      <button onClick={() => setDlOpen(o => !o)} disabled={exporting} style={{
+        ...glassInner({ padding: '4px 10px', borderRadius: 8 }),
+        border: 'none', cursor: exporting ? 'wait' : 'pointer',
+        display: 'flex', alignItems: 'center', gap: 4,
+        fontSize: 10, fontWeight: 600, color: '#3B82F6', fontFamily: 'var(--font)',
+        opacity: exporting ? 0.6 : 1,
+      }}>
+        <Download size={11} />{exporting ? 'Exporting…' : label}
+      </button>
+      {dlOpen && (
+        <div style={{
+          position: 'absolute', right: 0, top: '110%', zIndex: 200,
+          ...glass({ padding: '4px', borderRadius: 10 }),
+          minWidth: 190, boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
+        }}>
+          {[
+            { fmt: 'png', label: 'Download PNG (300 DPI)' },
+            { fmt: 'pdf', label: 'Download PDF' },
+            { fmt: 'svg', label: 'Download SVG' },
+          ].map(({ fmt, label }) => (
+            <button key={fmt} onClick={() => triggerExport(fmt)} style={{
+              display: 'block', width: '100%', textAlign: 'left', padding: '7px 12px',
+              borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 11,
+              fontFamily: 'var(--font)', color: 'var(--text)', background: 'transparent', transition: 'background 0.15s',
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.5)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >{label}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Single Gas Chart Card ───
+function GasChart({ pollutant, allData, stationName }) {
+  const { key, name, unit, color, threshold } = pollutant;
+
+  const [chartRange, setChartRange] = useState('24h');
+  const [showNcec, setShowNcec] = useState(true);
+  const [ncecStdIdx, setNcecStdIdx] = useState(0);
+  const { dlOpen, setDlOpen, exporting, triggerExport, pubRef } = useChartExport();
+
+  // NCEC standards for this pollutant
+  const ncecStds = (NCEC_STANDARDS[key]?.standards) || [];
+  const ncecStd = ncecStds[ncecStdIdx] || null;
+  const ncecLimit = ncecStd?.limit ?? threshold;
+  const ncecLabel = ncecStd
+    ? `NCEC ${ncecStd.period}: ${ncecLimit} ${unit}`
+    : `NCEC: ${threshold} ${unit}`;
+
+  // Filter allData to this chart's time range
+  const chartData = useMemo(() => {
+    const hours = { '1h':1,'6h':6,'12h':12,'24h':24,'7d':168,'30d':720 }[chartRange] || 24;
+    const cutoff = allData.length
+      ? new Date(allData[allData.length - 1].timestamp).getTime() - hours * 3600000
+      : Date.now() - hours * 3600000;
+    return allData
+      .filter(r => new Date(r.timestamp).getTime() >= cutoff)
+      .map(r => ({ ...r, time: hours <= 24 ? formatTime(r.timestamp) : formatDate(r.timestamp) }));
+  }, [allData, chartRange]);
+
+  const values   = chartData.map(d => d[key]).filter(v => v != null);
+  const current  = values.length ? values[values.length - 1] : null;
+  const avg      = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+  const min      = values.length ? Math.min(...values) : null;
+  const maxVal   = values.length ? Math.max(...values) : null;
+  const over     = current != null && current > threshold;
+  const prevAvg  = values.length > 4 ? values.slice(0, Math.floor(values.length / 2)).reduce((a, b) => a + b, 0) / Math.floor(values.length / 2) : null;
+  const trend    = avg && prevAvg ? (avg > prevAvg ? 'up' : 'down') : null;
+  const trendPct = avg && prevAvg ? Math.abs(((avg - prevAvg) / prevAvg) * 100).toFixed(0) : null;
+
+  const fromTs = chartData[0]?.timestamp;
+  const toTs   = chartData[chartData.length - 1]?.timestamp;
+  const filename = buildExportFilename(key.toUpperCase(), stationName, fromTs, toTs, exporting ? 'png' : 'png');
+
+  return (
+    <div style={{ ...glass({ padding: '16px 18px' }), animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) both', position: 'relative' }}>
+
+      {/* ── Control bar ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
+        {/* Time range quick buttons */}
+        <div style={{ ...glassInner({ padding: '2px 3px', borderRadius: 9 }), display: 'flex', gap: 1 }}>
+          {['1h','6h','12h','24h','7d','30d'].map(t => (
+            <button key={t} onClick={() => setChartRange(t)} style={{
+              padding: '3px 7px', borderRadius: 6, border: 'none', cursor: 'pointer',
+              fontSize: 10, fontWeight: 600, fontFamily: 'var(--mono)',
+              background: chartRange === t ? '#0d9488' : 'transparent',
+              color: chartRange === t ? '#fff' : 'var(--text-faint)',
+              transition: 'all 0.15s',
+            }}>{t}</button>
+          ))}
+        </div>
+
+        {/* Right: NCEC toggle + standard selector + download */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 10, color: 'var(--text-muted)', userSelect: 'none' }}>
+            <input type="checkbox" checked={showNcec} onChange={e => setShowNcec(e.target.checked)} style={{ cursor: 'pointer', accentColor: '#DC2626' }} />
+            NCEC
+          </label>
+          {showNcec && ncecStds.length > 1 && (
+            <select value={ncecStdIdx} onChange={e => setNcecStdIdx(Number(e.target.value))} style={{
+              fontSize: 9, padding: '2px 5px', borderRadius: 6, cursor: 'pointer',
+              border: '1px solid var(--glass-inner-border)', background: 'var(--glass-inner-bg)',
+              color: 'var(--text-muted)', fontFamily: 'var(--mono)',
+            }}>
+              {ncecStds.map((s, i) => <option key={i} value={i}>{s.period}: {s.limit}</option>)}
+            </select>
+          )}
+          <DlButton dlOpen={dlOpen} setDlOpen={setDlOpen} triggerExport={triggerExport} exporting={exporting} />
+        </div>
+      </div>
+
+      {/* ── Chart header ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
             <div style={{ width: 10, height: 10, borderRadius: 3, background: color }} />
             <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: 'var(--text)' }}>{name}</h3>
             {over && <AlertTriangle size={14} color="#DC2626" />}
           </div>
-          <p style={{ fontSize: 10, color: 'var(--text-faint)', margin: 0 }}>NCEC Limit: {threshold} {unit}</p>
+          {showNcec && <p style={{ fontSize: 10, color: 'var(--text-faint)', margin: 0 }}>{ncecLabel}</p>}
         </div>
         <div style={{ textAlign: 'right' }}>
           <p style={{ fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 700, color: over ? '#DC2626' : color, margin: 0, lineHeight: 1 }}>
@@ -120,8 +457,10 @@ function GasChart({ pollutant, data }) {
           )}
         </div>
       </div>
+
+      {/* ── Screen chart ── */}
       <ResponsiveContainer width="100%" height={160}>
-        <AreaChart data={data} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+        <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
           <defs>
             <linearGradient id={`grad-${key}`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={color} stopOpacity={0.2} />
@@ -132,20 +471,43 @@ function GasChart({ pollutant, data }) {
           <XAxis dataKey="time" tick={{ fill: 'var(--text-faint)', fontSize: 9, fontFamily: 'var(--font-mono)' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
           <YAxis tick={{ fill: 'var(--text-faint)', fontSize: 9, fontFamily: 'var(--font-mono)' }} axisLine={false} tickLine={false} domain={[0, 'auto']} />
           <Tooltip content={<GlassTooltip />} />
-          <ReferenceLine y={threshold} stroke="#DC262680" strokeDasharray="4 4" label={{ value: 'NCEC', position: 'right', fontSize: 9, fill: '#DC2626' }} />
+          {showNcec && (
+            <ReferenceLine y={ncecLimit} stroke="#DC262680" strokeDasharray="4 4"
+              label={{ value: 'NCEC', position: 'right', fontSize: 9, fill: '#DC2626' }} />
+          )}
           <Area type="monotone" dataKey={key} stroke={color} fill={`url(#grad-${key})`} strokeWidth={2} dot={false} name={name} />
         </AreaChart>
       </ResponsiveContainer>
+
+      {/* ── Stats row ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.25)' }}>
-        {[{ label: 'Min', value: min }, { label: 'Avg', value: avg }, { label: 'Max', value: maxVal }, { label: 'Limit', value: threshold }].map((s, i) => (
+        {[{ label: 'Min', value: min }, { label: 'Avg', value: avg }, { label: 'Max', value: maxVal }, { label: 'NCEC', value: ncecLimit }].map((s, i) => (
           <div key={i} style={{ textAlign: 'center' }}>
             <p style={{ fontSize: 9, color: 'var(--text-faint)', margin: 0, fontWeight: 600, textTransform: 'uppercase' }}>{s.label}</p>
             <p style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: s.label === 'Max' && s.value > threshold ? '#DC2626' : 'var(--text)', margin: '1px 0 0' }}>
-              {s.value != null ? s.value.toFixed(1) : '—'}
+              {s.value != null ? (typeof s.value === 'number' ? s.value.toFixed(1) : s.value) : '—'}
             </p>
           </div>
         ))}
       </div>
+
+      {/* ── Hidden publication chart for export ── */}
+      {exporting && (
+        <div
+          ref={pubRef}
+          data-filename={buildExportFilename(key.toUpperCase(), stationName, fromTs, toTs, 'png')}
+          style={{ position: 'fixed', left: '-9999px', top: 0, width: 1200, padding: '28px 36px', border: '1px solid #111', background: '#fff', zIndex: -1 }}
+        >
+          <PubChartContent
+            pollutant={pollutant}
+            data={chartData}
+            stationName={stationName}
+            showNcec={showNcec}
+            ncecLimit={ncecLimit}
+            ncecLabel={ncecLabel}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -170,17 +532,14 @@ function pearsonR(xs, ys) {
   const dy = Math.sqrt(ys.reduce((s, y) => s + (y - my) ** 2, 0));
   return dx && dy ? num / (dx * dy) : 0;
 }
-
 function linReg(xs, ys) {
   const n = xs.length;
   if (n < 2) return { m: 0, b: 0 };
   const mx = xs.reduce((a, b) => a + b, 0) / n;
   const my = ys.reduce((a, b) => a + b, 0) / n;
   const m = xs.reduce((s, x, i) => s + (x - mx) * (ys[i] - my), 0) / xs.reduce((s, x) => s + (x - mx) ** 2, 0);
-  const b = my - m * mx;
-  return { m, b };
+  return { m, b: my - m * mx };
 }
-
 function rInterpret(r) {
   const abs = Math.abs(r);
   const sign = r > 0 ? 'positive' : 'negative';
@@ -202,14 +561,12 @@ const CORR_PARAMS = [
   { key: 'wind_speed',  name: 'Wind Speed', unit: 'm/s', color: '#A78BFA' },
   { key: 'wind_direction', name: 'Wind Dir', unit: '°', color: '#F97316' },
 ];
-
 const CORR_PRESETS = [
   { label: 'Wind vs PM₂.₅', x: 'wind_speed', y: 'pm25' },
   { label: 'Temp vs O₃',    x: 'temperature', y: 'o3' },
   { label: 'RH vs PM₂.₅',  x: 'humidity', y: 'pm25' },
   { label: 'WD vs PM₁₀',   x: 'wind_direction', y: 'pm10' },
 ];
-
 function aqiDotColor(aqi) {
   if (aqi == null) return '#94a3b8';
   if (aqi <= 50)  return '#16A34A';
@@ -219,38 +576,24 @@ function aqiDotColor(aqi) {
   return '#7C3AED';
 }
 
-function CorrelationChart({ data }) {
-  console.log('[CorrelationChart] rendering, data points:', data?.length);
+function CorrelationChart({ data, stationName }) {
   const [xKey, setXKey] = useState('wind_speed');
   const [yKey, setYKey] = useState('pm25');
+  const { dlOpen, setDlOpen, exporting, triggerExport, pubRef } = useChartExport();
 
   const xParam = CORR_PARAMS.find(p => p.key === xKey) || CORR_PARAMS[0];
   const yParam = CORR_PARAMS.find(p => p.key === yKey) || CORR_PARAMS[1];
 
-  // Build scatter points from hourly aggregated data
-  const points = useMemo(() => {
-    return data
-      .filter(r => r[xKey] != null && r[yKey] != null)
-      .map(r => ({
-        x: Number(r[xKey]),
-        y: Number(r[yKey]),
-        aqi: r.aqi != null ? Number(r.aqi) : null,
-      }));
-  }, [data, xKey, yKey]);
+  const points = useMemo(() => (
+    data.filter(r => r[xKey] != null && r[yKey] != null)
+      .map(r => ({ x: Number(r[xKey]), y: Number(r[yKey]), aqi: r.aqi != null ? Number(r.aqi) : null }))
+  ), [data, xKey, yKey]);
 
-  const xs = points.map(p => p.x);
-  const ys = points.map(p => p.y);
+  const xs = points.map(p => p.x), ys = points.map(p => p.y);
   const r = points.length >= 2 ? pearsonR(xs, ys) : 0;
   const { m, b } = points.length >= 2 ? linReg(xs, ys) : { m: 0, b: 0 };
-
-  // Trend line: 2 points from min to max x
-  const xMin = xs.length ? Math.min(...xs) : 0;
-  const xMax = xs.length ? Math.max(...xs) : 1;
-  const trendData = xs.length >= 2 ? [
-    { x: xMin, y: m * xMin + b },
-    { x: xMax, y: m * xMax + b },
-  ] : [];
-
+  const xMin = xs.length ? Math.min(...xs) : 0, xMax = xs.length ? Math.max(...xs) : 1;
+  const trendData = xs.length >= 2 ? [{ x: xMin, y: m * xMin + b }, { x: xMax, y: m * xMax + b }] : [];
   const rColor = Math.abs(r) >= 0.7 ? '#16A34A' : Math.abs(r) >= 0.4 ? '#F59E0B' : '#94a3b8';
 
   const selStyle = (active) => ({
@@ -275,40 +618,34 @@ function CorrelationChart({ data }) {
           </h3>
           <p style={{ fontSize: 11, color: 'var(--text-faint)', margin: 0 }}>Scatter plot of parameter relationships</p>
         </div>
-
-        {/* Presets */}
-        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {CORR_PRESETS.map(p => (
             <button key={p.label} onClick={() => { setXKey(p.x); setYKey(p.y); }} style={selStyle(xKey === p.x && yKey === p.y)}>
               {p.label}
             </button>
           ))}
+          <DlButton dlOpen={dlOpen} setDlOpen={setDlOpen} triggerExport={triggerExport} exporting={exporting} />
         </div>
       </div>
 
-      {/* Axis selectors */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>X Axis:</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>X:</span>
           <select value={xKey} onChange={e => setXKey(e.target.value)} style={{ padding: '5px 9px', borderRadius: 8, fontSize: 12, color: 'var(--text)', background: 'var(--glass-inner-bg)', border: '1px solid var(--glass-inner-border)', outline: 'none', fontFamily: 'var(--font)' }}>
             {CORR_PARAMS.map(p => <option key={p.key} value={p.key}>{p.name} ({p.unit})</option>)}
           </select>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Y Axis:</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Y:</span>
           <select value={yKey} onChange={e => setYKey(e.target.value)} style={{ padding: '5px 9px', borderRadius: 8, fontSize: 12, color: 'var(--text)', background: 'var(--glass-inner-bg)', border: '1px solid var(--glass-inner-border)', outline: 'none', fontFamily: 'var(--font)' }}>
             {CORR_PARAMS.map(p => <option key={p.key} value={p.key}>{p.name} ({p.unit})</option>)}
           </select>
         </div>
-
-        {/* R value badge */}
         {points.length >= 2 && (
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ textAlign: 'right' }}>
-              <p style={{ fontSize: 10, color: 'var(--text-faint)', margin: 0, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Pearson R</p>
-              <p style={{ fontSize: 22, fontWeight: 700, margin: 0, fontFamily: 'var(--mono)', color: rColor, lineHeight: 1 }}>{r.toFixed(3)}</p>
-              <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: '2px 0 0' }}>{rInterpret(r)}</p>
-            </div>
+          <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+            <p style={{ fontSize: 10, color: 'var(--text-faint)', margin: 0, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Pearson R</p>
+            <p style={{ fontSize: 22, fontWeight: 700, margin: 0, fontFamily: 'var(--mono)', color: rColor, lineHeight: 1 }}>{r.toFixed(3)}</p>
+            <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: '2px 0 0' }}>{rInterpret(r)}</p>
           </div>
         )}
       </div>
@@ -321,55 +658,33 @@ function CorrelationChart({ data }) {
         <ResponsiveContainer width="100%" height={340}>
           <ComposedChart margin={{ top: 10, right: 20, bottom: 20, left: 10 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" />
-            <XAxis
-              dataKey="x" type="number" domain={['auto', 'auto']}
-              name={xParam.name}
+            <XAxis dataKey="x" type="number" domain={['auto', 'auto']} name={xParam.name}
               label={{ value: `${xParam.name} (${xParam.unit})`, position: 'insideBottom', offset: -10, fill: 'var(--text-muted)', fontSize: 11 }}
               tick={{ fill: 'var(--text-faint)', fontSize: 10, fontFamily: 'var(--mono)' }}
-              axisLine={false} tickLine={false}
-            />
-            <YAxis
-              dataKey="y" type="number" domain={['auto', 'auto']}
-              name={yParam.name}
+              axisLine={false} tickLine={false} />
+            <YAxis dataKey="y" type="number" domain={['auto', 'auto']} name={yParam.name}
               label={{ value: `${yParam.name} (${yParam.unit})`, angle: -90, position: 'insideLeft', offset: 10, fill: 'var(--text-muted)', fontSize: 11 }}
               tick={{ fill: 'var(--text-faint)', fontSize: 10, fontFamily: 'var(--mono)' }}
-              axisLine={false} tickLine={false}
-            />
-            <Tooltip
-              content={({ active, payload }) => {
-                if (!active || !payload?.length) return null;
-                const d = payload[0]?.payload || {};
-                return (
-                  <div style={{ ...glass({ padding: '8px 12px', borderRadius: 10 }), boxShadow: '0 8px 24px rgba(0,0,0,0.1)' }}>
-                    <p style={{ fontSize: 11, color: 'var(--text)', margin: 0 }}>
-                      {xParam.name}: <strong style={{ fontFamily: 'var(--mono)' }}>{typeof d.x === 'number' ? d.x.toFixed(2) : d.x}</strong>
-                    </p>
-                    <p style={{ fontSize: 11, color: 'var(--text)', margin: '2px 0 0' }}>
-                      {yParam.name}: <strong style={{ fontFamily: 'var(--mono)' }}>{typeof d.y === 'number' ? d.y.toFixed(2) : d.y}</strong>
-                    </p>
-                    {d.aqi != null && <p style={{ fontSize: 10, color: aqiDotColor(d.aqi), margin: '2px 0 0' }}>AQI: {Math.round(d.aqi)}</p>}
-                  </div>
-                );
-              }}
-            />
+              axisLine={false} tickLine={false} />
+            <Tooltip content={({ active, payload }) => {
+              if (!active || !payload?.length) return null;
+              const d = payload[0]?.payload || {};
+              return (
+                <div style={{ ...glass({ padding: '8px 12px', borderRadius: 10 }), boxShadow: '0 8px 24px rgba(0,0,0,0.1)' }}>
+                  <p style={{ fontSize: 11, color: 'var(--text)', margin: 0 }}>{xParam.name}: <strong style={{ fontFamily: 'var(--mono)' }}>{typeof d.x === 'number' ? d.x.toFixed(2) : d.x}</strong></p>
+                  <p style={{ fontSize: 11, color: 'var(--text)', margin: '2px 0 0' }}>{yParam.name}: <strong style={{ fontFamily: 'var(--mono)' }}>{typeof d.y === 'number' ? d.y.toFixed(2) : d.y}</strong></p>
+                  {d.aqi != null && <p style={{ fontSize: 10, color: aqiDotColor(d.aqi), margin: '2px 0 0' }}>AQI: {Math.round(d.aqi)}</p>}
+                </div>
+              );
+            }} />
             <Scatter data={points} shape={<CustomDot />} />
             {trendData.length === 2 && (
-              <RLine
-                data={trendData}
-                dataKey="y"
-                dot={false}
-                stroke="#0d9488"
-                strokeWidth={2}
-                strokeDasharray="6 3"
-                type="linear"
-                isAnimationActive={false}
-              />
+              <RLine data={trendData} dataKey="y" dot={false} stroke="#0d9488" strokeWidth={2} strokeDasharray="6 3" type="linear" isAnimationActive={false} />
             )}
           </ComposedChart>
         </ResponsiveContainer>
       )}
 
-      {/* AQI color legend */}
       <div style={{ display: 'flex', gap: 14, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-faint)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Dot color = AQI:</span>
         {[['#16A34A','Good (0-50)'],['#CA8A04','Moderate (51-100)'],['#EA580C','USG (101-150)'],['#DC2626','Unhealthy (151-200)'],['#7C3AED','Very Unhealthy (200+)'],['#94a3b8','Unknown']].map(([c, l]) => (
@@ -379,6 +694,21 @@ function CorrelationChart({ data }) {
           </div>
         ))}
       </div>
+
+      {/* Hidden pub chart */}
+      {exporting && (
+        <div
+          ref={pubRef}
+          data-filename={buildExportFilename(`Corr_${xKey}_vs_${yKey}`, stationName, null, null, 'png')}
+          style={{ position: 'fixed', left: '-9999px', top: 0, width: 1200, padding: '28px 36px', border: '1px solid #111', background: '#fff', zIndex: -1 }}
+        >
+          <PubCorrContent
+            xParam={xParam} yParam={yParam}
+            points={points} trendData={trendData} rValue={r}
+            stationName={stationName}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -386,7 +716,7 @@ function CorrelationChart({ data }) {
 // ═══ Charts Page ═══
 export default function Charts({ profile }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [isPhone, setIsPhone] = useState(window.innerWidth < 480);
+  const [isPhone, setIsPhone]   = useState(window.innerWidth < 480);
   useEffect(() => {
     const handle = () => { setIsMobile(window.innerWidth < 768); setIsPhone(window.innerWidth < 480); };
     window.addEventListener('resize', handle);
@@ -394,18 +724,21 @@ export default function Charts({ profile }) {
   }, []);
 
   const { stationId } = useParams();
-  const [stations, setStations]     = useState([]);
-  const [selIdx, setSelIdx]         = useState(0);
-  const [timeRange, setTimeRange]   = useState('24h');
-  const [data, setData]             = useState([]);
+  const [stations, setStations]       = useState([]);
+  const [selIdx, setSelIdx]           = useState(0);
+  const [timeRange, setTimeRange]     = useState('24h');
+  const [allData, setAllData]         = useState([]);   // full 30d history
   const [overlayKeys, setOverlayKeys] = useState(['pm25', 'pm10', 'o3']);
 
+  // Multi-overlay export
+  const overlayExport = useChartExport();
+
   // Table state
-  const [aggMode, setAggMode]   = useState('raw');
-  const [sortKey, setSortKey]   = useState('timestamp');
-  const [sortDir, setSortDir]   = useState('desc');
-  const [filter, setFilter]     = useState('');
-  const [page, setPage]         = useState(0);
+  const [aggMode, setAggMode] = useState('raw');
+  const [sortKey, setSortKey] = useState('timestamp');
+  const [sortDir, setSortDir] = useState('desc');
+  const [filter, setFilter]   = useState('');
+  const [page, setPage]       = useState(0);
 
   useEffect(() => {
     async function load() {
@@ -425,55 +758,50 @@ export default function Charts({ profile }) {
     }
   }, [stationId, stations]);
 
+  // Always load 720h (30d) so per-chart ranges can filter as needed
   useEffect(() => {
     if (!stations.length) return;
     const sid = stations[selIdx]?.id;
     if (!sid) return;
-    const hours = { '1h': 1, '6h': 6, '12h': 12, '24h': 24, '7d': 168, '30d': 720 }[timeRange] || 24;
-    const hist = getDemoHistory(sid, hours);
-    setData(hist.map(r => ({
-      ...r,
-      time: hours <= 24 ? formatTime(r.timestamp) : formatDate(r.timestamp),
-    })));
+    const hist = getDemoHistory(sid, 720);
+    setAllData(hist);
     setPage(0);
-  }, [selIdx, timeRange, stations]);
+  }, [selIdx, stations]);
 
-  // Reset page when filter/agg/sort changes
   useEffect(() => { setPage(0); }, [aggMode, filter, sortKey, sortDir]);
 
   const station = stations[selIdx] || {};
 
+  // data = allData filtered to global timeRange (for table + multi-overlay)
+  const data = useMemo(() => {
+    const hours = { '1h':1,'6h':6,'12h':12,'24h':24,'7d':168,'30d':720 }[timeRange] || 24;
+    const cutoff = allData.length
+      ? new Date(allData[allData.length - 1].timestamp).getTime() - hours * 3600000
+      : Date.now() - hours * 3600000;
+    return allData
+      .filter(r => new Date(r.timestamp).getTime() >= cutoff)
+      .map(r => ({ ...r, time: hours <= 24 ? formatTime(r.timestamp) : formatDate(r.timestamp) }));
+  }, [allData, timeRange]);
+
   function toggleOverlay(key) {
     setOverlayKeys(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
   }
-
   function handleSort(key) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortKey(key); setSortDir('asc'); }
   }
 
-  // ─── Derived table rows ───
   const tableRows = useMemo(() => {
     let rows = aggregate(data, aggMode);
-
-    // Filter
     if (filter.trim()) {
       const q = filter.toLowerCase();
-      rows = rows.filter(r =>
-        Object.values(r).some(v => v != null && String(v).toLowerCase().includes(q))
-      );
+      rows = rows.filter(r => Object.values(r).some(v => v != null && String(v).toLowerCase().includes(q)));
     }
-
-    // Sort
     rows = [...rows].sort((a, b) => {
-      const av = a[sortKey] ?? '';
-      const bv = b[sortKey] ?? '';
-      const cmp = typeof av === 'number' && typeof bv === 'number'
-        ? av - bv
-        : String(av).localeCompare(String(bv));
+      const av = a[sortKey] ?? '', bv = b[sortKey] ?? '';
+      const cmp = typeof av === 'number' && typeof bv === 'number' ? av - bv : String(av).localeCompare(String(bv));
       return sortDir === 'asc' ? cmp : -cmp;
     });
-
     return rows;
   }, [data, aggMode, filter, sortKey, sortDir]);
 
@@ -481,7 +809,6 @@ export default function Charts({ profile }) {
   const pageRows   = tableRows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const showCount  = aggMode !== 'raw';
 
-  // ─── Export CSV ───
   function exportCSV() {
     if (!data.length) return;
     const rows = aggregate(data, aggMode);
@@ -505,7 +832,6 @@ export default function Charts({ profile }) {
     URL.revokeObjectURL(url);
   }
 
-  // ─── Shared button style ───
   const toggleBtn = (active, color = 'var(--text)') => ({
     padding: '5px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
     background: active ? 'rgba(255,255,255,0.7)' : 'transparent',
@@ -524,8 +850,12 @@ export default function Charts({ profile }) {
     transition: 'background 0.15s',
   });
 
+  const activePollutants = POLLUTANTS.filter(p => overlayKeys.includes(p.key));
+  const overlayFromTs = data[0]?.timestamp, overlayToTs = data[data.length - 1]?.timestamp;
+
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+
       {/* Header: Station selector + Time range */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12, flexDirection: isMobile ? 'column' : 'row' }}>
         <div style={{ ...glassInner({ padding: '4px 6px', borderRadius: 12 }), display: 'flex', gap: 3, overflowX: 'auto' }}>
@@ -566,18 +896,22 @@ export default function Charts({ profile }) {
         </div>
       </div>
 
-      {/* Gas charts grid */}
+      {/* Gas charts grid — each has its own range selector + export */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 14, marginBottom: 16 }}>
-        {POLLUTANTS.map(p => <GasChart key={p.key} pollutant={p} data={data} />)}
+        {POLLUTANTS.map(p => (
+          <GasChart key={p.key} pollutant={p} allData={allData} stationName={station.name || '—'} />
+        ))}
       </div>
 
       {/* Multi-pollutant overlay */}
       <div style={{ ...glass({ padding: '20px 22px', marginBottom: 16 }), animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.3s both' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
           <div>
             <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>Multi-Pollutant Overlay</h2>
             <p style={{ color: 'var(--text-faint)', fontSize: 11, margin: '2px 0 0' }}>Compare pollutants on one chart — click to toggle</p>
           </div>
+          <DlButton dlOpen={overlayExport.dlOpen} setDlOpen={overlayExport.setDlOpen}
+            triggerExport={overlayExport.triggerExport} exporting={overlayExport.exporting} />
         </div>
         <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
           {POLLUTANTS.map(p => (
@@ -603,83 +937,57 @@ export default function Charts({ profile }) {
             ))}
           </LineChart>
         </ResponsiveContainer>
+
+        {/* Hidden pub chart for overlay export */}
+        {overlayExport.exporting && (
+          <div
+            ref={overlayExport.pubRef}
+            data-filename={buildExportFilename('MultiOverlay', station.name, overlayFromTs, overlayToTs, 'png')}
+            style={{ position: 'fixed', left: '-9999px', top: 0, width: 1200, padding: '28px 36px', border: '1px solid #111', background: '#fff', zIndex: -1 }}
+          >
+            <PubOverlayContent activePollutants={activePollutants} data={data} stationName={station.name || '—'} />
+          </div>
+        )}
       </div>
 
-      {/* ─── Correlation Analysis ─── */}
-      <CorrelationChart data={aggregate(data, 'hourly')} />
+      {/* Correlation Analysis */}
+      <CorrelationChart data={aggregate(data, 'hourly')} stationName={station.name || '—'} />
 
-      {/* ─── Data Table ─── */}
+      {/* Data Table */}
       <div style={{ ...glass({ padding: '20px 22px' }), animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) 0.4s both' }}>
-
-        {/* Table toolbar */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>Data Table</h2>
-            {/* Aggregation toggle */}
             <div style={{ ...glassInner({ padding: '3px 4px', borderRadius: 9 }), display: 'flex', gap: 2 }}>
-              {[
-                { id: 'raw',    label: 'Raw' },
-                { id: '1min',   label: '1-Min Avg' },
-                { id: 'hourly', label: 'Hourly Avg' },
-                { id: '24h',    label: '24-Hr Avg' },
-              ].map(m => (
-                <button key={m.id} onClick={() => setAggMode(m.id)} style={toggleBtn(aggMode === m.id)}>
-                  {m.label}
-                </button>
+              {[{ id: 'raw', label: 'Raw' }, { id: '1min', label: '1-Min Avg' }, { id: 'hourly', label: 'Hourly Avg' }, { id: '24h', label: '24-Hr Avg' }].map(m => (
+                <button key={m.id} onClick={() => setAggMode(m.id)} style={toggleBtn(aggMode === m.id)}>{m.label}</button>
               ))}
             </div>
           </div>
-
-          {/* Search filter */}
           <div style={{ position: 'relative' }}>
             <Search size={12} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)', pointerEvents: 'none' }} />
-            <input
-              value={filter}
-              onChange={e => setFilter(e.target.value)}
-              placeholder="Filter readings…"
-              style={{
-                paddingLeft: 28, paddingRight: 10, paddingTop: 6, paddingBottom: 6,
-                borderRadius: 9, border: '1px solid rgba(255,255,255,0.5)',
-                background: 'rgba(255,255,255,0.35)', backdropFilter: 'blur(8px)',
-                fontSize: 11, color: 'var(--text)', fontFamily: 'var(--font)',
-                outline: 'none', width: 190,
-              }}
-            />
+            <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Filter readings…"
+              style={{ paddingLeft: 28, paddingRight: 10, paddingTop: 6, paddingBottom: 6, borderRadius: 9, border: '1px solid rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.35)', backdropFilter: 'blur(8px)', fontSize: 11, color: 'var(--text)', fontFamily: 'var(--font)', outline: 'none', width: 190 }} />
           </div>
         </div>
 
-        {/* Table */}
         <div data-scroll-x style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, fontFamily: 'var(--font-mono)', minWidth: 800 }}>
             <thead>
               <tr>
-                {/* Timestamp */}
                 <th style={{ ...thStyle('timestamp'), position: 'sticky', left: 0, zIndex: 2, background: sortKey === 'timestamp' ? 'rgba(240,237,233,0.95)' : 'rgba(232,228,222,0.95)' }} onClick={() => handleSort('timestamp')}>
                   Timestamp <SortArrow col="timestamp" sortKey={sortKey} sortDir={sortDir} />
                 </th>
-                {/* Count (aggregated modes) */}
-                {showCount && (
-                  <th style={thStyle('count')} onClick={() => handleSort('count')}>
-                    # <SortArrow col="count" sortKey={sortKey} sortDir={sortDir} />
-                  </th>
-                )}
-                {/* Pollutants */}
+                {showCount && <th style={thStyle('count')} onClick={() => handleSort('count')}># <SortArrow col="count" sortKey={sortKey} sortDir={sortDir} /></th>}
                 {POLLUTANTS.map(p => (
                   <th key={p.key} style={thStyle(p.key)} onClick={() => handleSort(p.key)}>
-                    {p.name}
-                    <span style={{ color: 'var(--text-faint)', fontWeight: 400, marginLeft: 2 }}>{p.unit}</span>
+                    {p.name}<span style={{ color: 'var(--text-faint)', fontWeight: 400, marginLeft: 2 }}>{p.unit}</span>
                     <SortArrow col={p.key} sortKey={sortKey} sortDir={sortDir} />
                   </th>
                 ))}
-                {/* Met */}
-                {[
-                  { key: 'temperature',   label: 'Temp',     unit: '°C' },
-                  { key: 'humidity',      label: 'Humidity', unit: '%'  },
-                  { key: 'wind_speed',    label: 'Wind',     unit: 'm/s' },
-                ].map(col => (
+                {[{ key: 'temperature', label: 'Temp', unit: '°C' }, { key: 'humidity', label: 'Humidity', unit: '%' }, { key: 'wind_speed', label: 'Wind', unit: 'm/s' }].map(col => (
                   <th key={col.key} style={thStyle(col.key)} onClick={() => handleSort(col.key)}>
-                    {col.label}
-                    <span style={{ color: 'var(--text-faint)', fontWeight: 400, marginLeft: 2 }}>{col.unit}</span>
+                    {col.label}<span style={{ color: 'var(--text-faint)', fontWeight: 400, marginLeft: 2 }}>{col.unit}</span>
                     <SortArrow col={col.key} sortKey={sortKey} sortDir={sortDir} />
                   </th>
                 ))}
@@ -687,36 +995,22 @@ export default function Charts({ profile }) {
             </thead>
             <tbody>
               {pageRows.length === 0 ? (
-                <tr>
-                  <td colSpan={99} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)', fontFamily: 'var(--font)' }}>
-                    No readings match your filter.
-                  </td>
-                </tr>
+                <tr><td colSpan={99} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-faint)', fontFamily: 'var(--font)' }}>No readings match your filter.</td></tr>
               ) : pageRows.map((row, i) => (
                 <tr key={i} style={{ background: i % 2 === 0 ? 'rgba(255,255,255,0.15)' : 'transparent' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
                   onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? 'rgba(255,255,255,0.15)' : 'transparent'}
                 >
-                  {/* Timestamp */}
-                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap', color: 'var(--text-mid)', position: 'sticky', left: 0, zIndex: 1, background: 'inherit' }}>
-                    {fmtTs(row.timestamp)}
-                  </td>
-                  {/* Count */}
-                  {showCount && (
-                    <td style={{ padding: '6px 10px', color: 'var(--text-muted)', textAlign: 'center' }}>{row.count}</td>
-                  )}
-                  {/* Pollutant cells */}
+                  <td style={{ padding: '6px 10px', whiteSpace: 'nowrap', color: 'var(--text-mid)', position: 'sticky', left: 0, zIndex: 1, background: 'inherit' }}>{fmtTs(row.timestamp)}</td>
+                  {showCount && <td style={{ padding: '6px 10px', color: 'var(--text-muted)', textAlign: 'center' }}>{row.count}</td>}
                   {POLLUTANTS.map(p => {
                     const v = row[p.key];
-                    const color = cellColor(p.key, v);
-                    const bg    = cellBg(p.key, v);
                     return (
-                      <td key={p.key} style={{ padding: '6px 10px', color, fontWeight: color !== 'var(--text)' && color !== 'var(--text-muted)' ? 700 : 400, background: bg, transition: 'background 0.15s' }}>
+                      <td key={p.key} style={{ padding: '6px 10px', color: cellColor(p.key, v), fontWeight: cellColor(p.key, v) !== 'var(--text)' && cellColor(p.key, v) !== 'var(--text-muted)' ? 700 : 400, background: cellBg(p.key, v), transition: 'background 0.15s' }}>
                         {v != null ? v.toFixed(1) : '—'}
                       </td>
                     );
                   })}
-                  {/* Met cells */}
                   <td style={{ padding: '6px 10px', color: 'var(--text)' }}>{row.temperature != null ? row.temperature.toFixed(1) : '—'}</td>
                   <td style={{ padding: '6px 10px', color: 'var(--text)' }}>{row.humidity    != null ? row.humidity.toFixed(0)    : '—'}</td>
                   <td style={{ padding: '6px 10px', color: 'var(--text)' }}>{row.wind_speed  != null ? row.wind_speed.toFixed(1)  : '—'}</td>
@@ -726,27 +1020,15 @@ export default function Charts({ profile }) {
           </table>
         </div>
 
-        {/* Pagination footer */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, flexWrap: 'wrap', gap: 8 }}>
           <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font)' }}>
-            {tableRows.length === 0
-              ? 'No readings'
-              : `Showing ${page * PAGE_SIZE + 1}–${Math.min((page + 1) * PAGE_SIZE, tableRows.length)} of ${tableRows.length} ${aggMode === 'raw' ? 'readings' : 'periods'}`
-            }
+            {tableRows.length === 0 ? 'No readings' : `Showing ${page * PAGE_SIZE + 1}–${Math.min((page + 1) * PAGE_SIZE, tableRows.length)} of ${tableRows.length} ${aggMode === 'raw' ? 'readings' : 'periods'}`}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <button
-              onClick={() => setPage(0)}
-              disabled={page === 0}
-              style={{ ...glassInner({ padding: '4px 8px', borderRadius: 7 }), border: 'none', cursor: page === 0 ? 'default' : 'pointer', fontSize: 10, color: page === 0 ? '#D6D3D1' : 'var(--text-mid)', fontFamily: 'var(--font)' }}
-            >«</button>
-            <button
-              onClick={() => setPage(p => Math.max(0, p - 1))}
-              disabled={page === 0}
-              style={{ ...glassInner({ padding: '4px 7px', borderRadius: 7 }), border: 'none', cursor: page === 0 ? 'default' : 'pointer', color: page === 0 ? '#D6D3D1' : 'var(--text-mid)', display: 'flex', alignItems: 'center' }}
-            ><ChevronLeft size={13} /></button>
-
-            {/* Page number pills */}
+            <button onClick={() => setPage(0)} disabled={page === 0}
+              style={{ ...glassInner({ padding: '4px 8px', borderRadius: 7 }), border: 'none', cursor: page === 0 ? 'default' : 'pointer', fontSize: 10, color: page === 0 ? '#D6D3D1' : 'var(--text-mid)', fontFamily: 'var(--font)' }}>«</button>
+            <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
+              style={{ ...glassInner({ padding: '4px 7px', borderRadius: 7 }), border: 'none', cursor: page === 0 ? 'default' : 'pointer', color: page === 0 ? '#D6D3D1' : 'var(--text-mid)', display: 'flex', alignItems: 'center' }}><ChevronLeft size={13} /></button>
             {isPhone
               ? <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', padding: '0 6px' }}>{page + 1} / {totalPages}</span>
               : Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -763,17 +1045,10 @@ export default function Charts({ profile }) {
                   );
                 })
             }
-
-            <button
-              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-              disabled={page >= totalPages - 1}
-              style={{ ...glassInner({ padding: '4px 7px', borderRadius: 7 }), border: 'none', cursor: page >= totalPages - 1 ? 'default' : 'pointer', color: page >= totalPages - 1 ? '#D6D3D1' : 'var(--text-mid)', display: 'flex', alignItems: 'center' }}
-            ><ChevronRight size={13} /></button>
-            <button
-              onClick={() => setPage(totalPages - 1)}
-              disabled={page >= totalPages - 1}
-              style={{ ...glassInner({ padding: '4px 8px', borderRadius: 7 }), border: 'none', cursor: page >= totalPages - 1 ? 'default' : 'pointer', fontSize: 10, color: page >= totalPages - 1 ? '#D6D3D1' : 'var(--text-mid)', fontFamily: 'var(--font)' }}
-            >»</button>
+            <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
+              style={{ ...glassInner({ padding: '4px 7px', borderRadius: 7 }), border: 'none', cursor: page >= totalPages - 1 ? 'default' : 'pointer', color: page >= totalPages - 1 ? '#D6D3D1' : 'var(--text-mid)', display: 'flex', alignItems: 'center' }}><ChevronRight size={13} /></button>
+            <button onClick={() => setPage(totalPages - 1)} disabled={page >= totalPages - 1}
+              style={{ ...glassInner({ padding: '4px 8px', borderRadius: 7 }), border: 'none', cursor: page >= totalPages - 1 ? 'default' : 'pointer', fontSize: 10, color: page >= totalPages - 1 ? '#D6D3D1' : 'var(--text-mid)', fontFamily: 'var(--font)' }}>»</button>
           </div>
         </div>
       </div>
