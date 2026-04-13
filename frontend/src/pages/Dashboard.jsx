@@ -211,7 +211,7 @@ function WindCompassCard({ direction, speed, delay = 0, spanFull }) {
           fill={isNS ? 'var(--text-mid)' : 'var(--text-faint)'}
           fontFamily="var(--font)">{label}</text>;
       })}
-      <g style={{ transformOrigin: `${cx}px ${cy}px`, transform: `rotate(${dir + 180}deg)`, transition: 'transform 0.7s cubic-bezier(.34,1.56,.64,1)' }}>
+      <g style={{ transformOrigin: `${cx}px ${cy}px`, transform: `rotate(${dir + 180}deg)`, transition: 'transform 1s ease' }}>
         <polygon points={`${cx},${cy - innerR + 1} ${cx - 5},${cy - innerR + 10} ${cx + 5},${cy - innerR + 10}`} fill="#0d9488" />
         <line x1={cx} y1={cy - innerR + 10} x2={cx} y2={cy + 7} stroke="#0d9488" strokeWidth="2.5" strokeLinecap="round" />
         <circle cx={cx} cy={cy} r="3" fill="#0d9488" />
@@ -237,24 +237,42 @@ function WindCompassCard({ direction, speed, delay = 0, spanFull }) {
 // ─── Temperature Card ───────────────────────────────────────────────────────────
 function ThermometerCard({ value, low, high, delay = 0, spanFull }) {
   const temp = value ?? 0;
-  const fillH = Math.round(Math.max(0, Math.min(1, temp / 50)) * 40);
-  const bulbColor = temp > 40 ? '#ef4444' : temp > 25 ? '#f97316' : '#3b82f6';
-  const tempStatus = temp > 40 ? 'Very Hot' : temp > 30 ? 'Hot' : temp > 20 ? 'Warm' : 'Cool';
-  const tempStatusColor = temp > 40 ? '#ef4444' : temp > 30 ? '#f97316' : temp > 20 ? '#f59e0b' : '#3b82f6';
+  const fillFrac = Math.max(0, Math.min(1, temp / 50));
+  const fillColor = temp > 45 ? '#991b1b' : temp > 35 ? '#ef4444' : temp > 25 ? '#f97316' : temp > 15 ? '#10b981' : '#3b82f6';
+  const bulbColor = temp > 35 ? '#ef4444' : temp > 25 ? '#f97316' : temp > 15 ? '#10b981' : '#3b82f6';
+  const tempStatus = temp > 40 ? 'Very Hot' : temp > 30 ? 'Hot' : temp > 20 ? 'Warm' : temp > 10 ? 'Mild' : 'Cool';
+  const tempStatusColor = temp > 40 ? '#ef4444' : temp > 30 ? '#f97316' : temp > 20 ? '#f59e0b' : temp > 10 ? '#10b981' : '#3b82f6';
+  // Track: y=2 (50°C) to y=44 (0°C), height=42px
+  const markY = (deg) => 44 - 42 * (deg / 50);
+  const currentY = markY(temp);
 
   const visual = (
-    <svg width={22} height={68} viewBox="0 0 14 64">
-      <defs>
-        <linearGradient id="thermo-grad" x1="0" y1="1" x2="0" y2="0" gradientUnits="objectBoundingBox">
-          <stop offset="0%" stopColor="#3b82f6" />
-          <stop offset="50%" stopColor="#f97316" />
-          <stop offset="100%" stopColor="#ef4444" />
-        </linearGradient>
-      </defs>
+    <svg width={30} height={68} viewBox="0 0 22 64">
+      {/* Track background */}
       <rect x="5" y="2" width="4" height="42" rx="2" fill="#e5e7eb" />
-      {fillH > 0 && <rect x="5" y={44 - fillH} width="4" height={fillH} rx="2" fill="url(#thermo-grad)" />}
-      <circle cx="7" cy="57" r="7" fill={bulbColor} />
-      <circle cx="7" cy="57" r="4.5" fill="rgba(255,255,255,0.28)" />
+      {/* Animated fill — scales up from bottom */}
+      <rect x="5" y="2" width="4" height="42" rx="2"
+        fill={fillColor}
+        style={{
+          transformOrigin: '7px 44px',
+          transform: `scaleY(${fillFrac})`,
+          transition: 'transform 0.9s ease, fill 1.1s ease',
+        }}
+      />
+      {/* Scale ticks at every 10°C on right side of tube */}
+      {[0, 10, 20, 30, 40, 50].map(deg => (
+        <line key={deg} x1="9.5" y1={markY(deg)} x2="12" y2={markY(deg)}
+          stroke="var(--text-faint)" strokeWidth="0.7" />
+      ))}
+      {/* Current temp indicator tick — wider, colored */}
+      <line x1="4" y1={currentY} x2="13" y2={currentY}
+        stroke={fillColor} strokeWidth="1.5" />
+      {/* Bulb */}
+      <circle cx="7" cy="57" r="7" fill={bulbColor}
+        style={{ transition: 'fill 1.1s ease' }} />
+      {/* Bulb highlight — pulses */}
+      <circle cx="7" cy="57" r="4.5" fill="rgba(255,255,255,0.28)"
+        style={{ animation: 'bulb-pulse 2.5s ease-in-out infinite' }} />
     </svg>
   );
 
@@ -277,21 +295,40 @@ function ThermometerCard({ value, low, high, delay = 0, spanFull }) {
 function HumidityCard({ value, low, high, delay = 0, spanFull }) {
   const pct = Math.max(0, Math.min(100, value ?? 0));
   const dropPath = 'M 12,28 C 18,28 22,22 22,16 C 22,9 12,1 12,1 C 12,1 2,9 2,16 C 2,22 6,28 12,28 Z';
-  const fillY = 28 - (pct / 100) * 27;
+  const fillColor = pct > 80 ? '#1e3a5f' : pct > 60 ? '#1d4ed8' : pct > 30 ? '#3b82f6' : '#93c5fd';
   const humStatus = pct > 70 ? 'Humid' : pct > 40 ? 'Comfortable' : 'Dry';
-  const humColor = pct > 70 ? '#0ea5e9' : pct > 40 ? '#16a34a' : '#f59e0b';
+  const humColor = pct > 70 ? '#1d4ed8' : pct > 40 ? '#3b82f6' : '#f59e0b';
+  const shimmerDur = pct > 70 ? '2s' : '3s';
 
   const visual = (
-    <svg width={28} height={34} viewBox="0 0 24 30">
+    <svg width={32} height={38} viewBox="0 0 24 30">
       <defs>
         <clipPath id="drop-clip">
           <path d={dropPath} />
         </clipPath>
       </defs>
+      {/* Gray background */}
       <path d={dropPath} fill="#e5e7eb" />
-      <rect x="0" y={fillY} width="24" height={30 - fillY} fill="#0ea5e9" clipPath="url(#drop-clip)"
-        style={{ transition: 'y 1s cubic-bezier(.16,1,.3,1), height 1s cubic-bezier(.16,1,.3,1)' }} />
-      <path d={dropPath} fill="none" stroke="rgba(0,0,0,0.10)" strokeWidth="0.8" />
+      {/* Animated fill — scaleY from bottom of drop */}
+      <rect x="0" y="1" width="24" height="27"
+        fill={fillColor}
+        clipPath="url(#drop-clip)"
+        style={{
+          transformOrigin: '12px 28px',
+          transform: `scaleY(${pct / 100})`,
+          transition: 'transform 1s ease, fill 1s ease',
+        }}
+      />
+      {/* Shimmer — bright line scrolls upward through drop, clipped to drop shape */}
+      {pct > 8 && (
+        <g clipPath="url(#drop-clip)"
+          style={{ animation: `drop-shimmer ${shimmerDur} ease-in-out infinite` }}>
+          <rect x="4" y="26" width="16" height="2" rx="1" fill="rgba(255,255,255,0.32)" />
+        </g>
+      )}
+      {/* Outline — pulses at high humidity */}
+      <path d={dropPath} fill="none" stroke="rgba(0,0,0,0.25)" strokeWidth="0.8"
+        style={pct > 80 ? { animation: 'drop-pulse 1.5s ease-in-out infinite' } : { opacity: 0.4 }} />
     </svg>
   );
 
@@ -366,20 +403,42 @@ function PressureCard({ value, low, high, delay = 0, spanFull }) {
   );
 }
 
-// ─── Wind Speed Card ────────────────────────────────────────────────────────────
+// ─── Wind Speed Card — animated flowing wind lines ──────────────────────────────
 function WindSpeedCard({ value, low, high, delay = 0, spanFull }) {
-  const filled = beaufortBars(value);
-  const barHeights = [8, 14, 20, 26, 32];
+  const speed = value ?? 0;
+  // Animation duration: faster = stronger wind
+  const dur   = speed > 6 ? '1s' : speed > 4 ? '1.8s' : speed > 2 ? '2.8s' : speed > 0.5 ? '4.5s' : '8s';
+  // Wave amplitude: higher = more pronounced curve
+  const amp   = speed > 6 ? 9 : speed > 4 ? 7 : speed > 2 ? 5 : speed > 0.5 ? 3 : 1.5;
+  // Stroke width: thicker = stronger wind
+  const sw    = speed > 4 ? 2.5 : speed > 2 ? 2 : 1.5;
+  // Number of visible lines
+  const count = speed > 4 ? 4 : speed > 0.5 ? 3 : 2;
+  const W = 84; // visible container width; SVG is 2×W for seamless loop
+  const lineYs = [11, 21, 31, 41].slice(0, count);
+
+  // Each path covers 2 full wave cycles (0 → 2W) so translateX(-50%) = -W creates a seamless loop
+  const wavePath = (y) =>
+    `M 0,${y} Q ${W/4},${y - amp} ${W/2},${y} Q ${3*W/4},${y + amp} ${W},${y}` +
+    ` Q ${5*W/4},${y - amp} ${3*W/2},${y} Q ${7*W/4},${y + amp} ${2*W},${y}`;
 
   const visual = (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3 }}>
-      {barHeights.map((h, i) => (
-        <div key={i} style={{
-          width: 7, height: h, borderRadius: 2,
-          background: i < filled ? '#0d9488' : '#e5e7eb',
-          transition: 'background 0.5s ease',
-        }} />
-      ))}
+    <div style={{ width: W, height: 54, overflow: 'hidden', position: 'relative', flexShrink: 0 }}>
+      <svg
+        width={W * 2}
+        height={54}
+        style={{ display: 'block', animation: `wind-flow ${dur} linear infinite`, willChange: 'transform' }}
+      >
+        {lineYs.map((y, i) => (
+          <path key={i} d={wavePath(y)}
+            fill="none"
+            stroke="#0d9488"
+            strokeWidth={sw}
+            strokeLinecap="round"
+            opacity={0.3 + i * 0.2}
+          />
+        ))}
+      </svg>
     </div>
   );
 
