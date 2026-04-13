@@ -78,32 +78,71 @@ class AlertEngine:
             return None
 
     def get_rules(self, station_id: str) -> list:
+        """
+        Load alert rules from DB.  Falls back to hardcoded NCEC defaults when:
+          - alert_rules table is missing / query fails (exception)
+          - alert_rules table exists but has no rows yet (empty result)
+          - alert_rules uses the old schema (parameter/averaging_period/is_active)
+        """
+        HARDCODED = [
+            {"pollutant": r["pollutant"], "period": r["period_label"],
+             "threshold": r["limit"], "warning_pct": 80, "enabled": True, "id": None}
+            for r in NCEC_RULES
+        ]
         try:
-            # Global rules (station_id IS NULL)
+            # Try new schema (pollutant / period / enabled)
             g = (self.sb.table("alert_rules")
                  .select("*")
                  .is_("station_id", "null")
-                 .eq("enabled", True)
                  .execute())
-            rules = {(r["pollutant"], r["period"]): r for r in (g.data or [])}
+            rows = g.data or []
 
-            # Station-specific overrides
-            s = (self.sb.table("alert_rules")
-                 .select("*")
-                 .eq("station_id", station_id)
-                 .eq("enabled", True)
-                 .execute())
-            for r in (s.data or []):
-                rules[(r["pollutant"], r["period"])] = r
+            # Detect old schema: uses 'parameter' instead of 'pollutant'
+            if rows and "parameter" in rows[0] and "pollutant" not in rows[0]:
+                # Translate old schema → new schema shape
+                def _translate(r):
+                    return {
+                        "pollutant":   r.get("parameter", ""),
+                        "period":      r.get("averaging_period", ""),
+                        "threshold":   float(r.get("threshold", 0)),
+                        "warning_pct": 80,
+                        "enabled":     bool(r.get("is_active", True)),
+                        "id":          r.get("id"),
+                    }
+                global_rules = {(r["pollutant"], r["period"]): r
+                                for r in [_translate(x) for x in rows]
+                                if r["enabled"]}
+            else:
+                # New schema
+                global_rules = {(r["pollutant"], r["period"]): r
+                                 for r in rows
+                                 if r.get("enabled", True)}
 
-            return list(rules.values())
+            # Station-specific overrides (best-effort, may fail on old schema)
+            try:
+                s = (self.sb.table("alert_rules")
+                     .select("*")
+                     .eq("station_id", station_id)
+                     .execute())
+                for r in (s.data or []):
+                    if "parameter" in r and "pollutant" not in r:
+                        r = _translate(r) if "parameter" in r else r
+                    if r.get("enabled", True):
+                        global_rules[(r["pollutant"], r["period"])] = r
+            except Exception:
+                pass
+
+            result = list(global_rules.values())
+            if not result:
+                # Table exists but empty — seed hardcoded rules and return them
+                print("[AlertEngine] alert_rules table is empty — using hardcoded NCEC defaults. "
+                      "Run database/alerts_schema.sql in the Supabase SQL Editor to persist them.")
+                return HARDCODED
+            return result
+
         except Exception as e:
-            print(f"[AlertEngine] get_rules error: {e}")
-            # Fallback to hardcoded
-            return [{"pollutant": r["pollutant"], "period": r["period_label"],
-                     "threshold": r["limit"], "warning_pct": 80, "enabled": True,
-                     "id": None}
-                    for r in NCEC_RULES]
+            print(f"[AlertEngine] get_rules error ({type(e).__name__}): {e} — using hardcoded NCEC defaults")
+            return HARDCODED
 
     def get_daily_notif_count(self, station_id: str) -> int:
         today = _utcnow().date().isoformat()
@@ -131,12 +170,23 @@ class AlertEngine:
             "hour_count": 1 if status in ("triggered", "ongoing", "escalated") else 0,
             "created_at": now, "updated_at": now,
         }
-        res = self.sb.table("alert_events").insert(row).execute()
-        return res.data[0] if res.data else row
+        try:
+            res = self.sb.table("alert_events").insert(row).execute()
+            return res.data[0] if res.data else row
+        except Exception as e:
+            print(f"[AlertEngine] create_event failed ({pollutant}/{period}): {e}")
+            print("[AlertEngine] ⚠ alert_events table may be missing — run database/alerts_schema.sql in Supabase SQL Editor")
+            # Return a stub dict with a fake id so the caller doesn't crash
+            return {"id": None, **row}
 
     def update_event(self, event_id: str, updates: dict):
-        updates["updated_at"] = _utcnow().isoformat()
-        self.sb.table("alert_events").update(updates).eq("id", event_id).execute()
+        if event_id is None:
+            return  # stub event — table missing, skip silently
+        try:
+            updates["updated_at"] = _utcnow().isoformat()
+            self.sb.table("alert_events").update(updates).eq("id", event_id).execute()
+        except Exception as e:
+            print(f"[AlertEngine] update_event failed: {e}")
 
     def log(self, station_id: str, event_id: Optional[str], action: str, details: dict):
         try:
@@ -256,6 +306,7 @@ class AlertEngine:
         to_notify = []
 
         for rule in rules:
+          try:
             pollutant   = rule["pollutant"]
             period      = rule["period"]
             threshold   = float(rule["threshold"])
@@ -272,6 +323,8 @@ class AlertEngine:
             measured = self.compute_average(station_id, pollutant, hours)
             if measured is None:
                 continue
+
+            print(f"[AlertEngine] {station_name} | {pollutant} {period}: avg={measured:.2f} µg/m³, limit={threshold}")
 
             active = self.get_active_event(station_id, pollutant, period)
 
@@ -356,6 +409,11 @@ class AlertEngine:
                             "peak_value": active.get("peak_value"),
                             "duration_hrs": round(duration_hrs, 1),
                         })
+
+          except Exception as rule_err:
+            import traceback
+            print(f"[AlertEngine] Error processing rule {rule.get('pollutant','?')}/{rule.get('period','?')}: {rule_err}")
+            traceback.print_exc()
 
         if not to_notify:
             return
