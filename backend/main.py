@@ -254,16 +254,13 @@ async def poll_aqicn(client, station):
         d = r.json()
         if d.get("status") != "ok": return None
         dd = d["data"]; iaqi = dd.get("iaqi", {})
+        # AQICN iaqi.*.v values are AQI sub-index numbers (0-500), NOT µg/m³.
+        # Only use AQI + met data; exclude individual pollutant concentrations
+        # to prevent contaminating EnggEnv µg/m³ readings with sub-index values.
         return {
             "station_id":     station["id"],
             "timestamp":      datetime.utcnow().isoformat(),
             "aqi":            dd.get("aqi"),
-            "pm25":           iaqi.get("pm25", {}).get("v"),
-            "pm10":           iaqi.get("pm10", {}).get("v"),
-            "no2":            iaqi.get("no2",  {}).get("v"),
-            "o3":             iaqi.get("o3",   {}).get("v"),
-            "so2":            iaqi.get("so2",  {}).get("v"),
-            "co":             iaqi.get("co",   {}).get("v"),
             "temperature":    iaqi.get("t",    {}).get("v"),
             "humidity":       iaqi.get("h",    {}).get("v"),
             "wind_speed":     iaqi.get("w",    {}).get("v"),

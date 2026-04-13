@@ -849,24 +849,34 @@ function GasChart({ pollutant, allData, stationName }) {
     : `NCEC: ${threshold} ${unit}`;
 
   const chartData = useMemo(() => {
+    const GAS_KEYS = ['pm25','pm10','so2','no2','o3','co'];
     const hours = { '1h':1,'6h':6,'12h':12,'24h':24,'7d':168,'30d':720 }[chartRange] || 24;
     const cutoff = allData.length
       ? new Date(allData[allData.length - 1].timestamp).getTime() - hours * 3600000
       : Date.now() - hours * 3600000;
     return allData
       .filter(r => new Date(r.timestamp).getTime() >= cutoff)
-      .map(r => ({ ...r, time: hours <= 24 ? formatTime(r.timestamp) : formatDate(r.timestamp) }));
+      .map(r => {
+        const row = { ...r, time: hours <= 24 ? formatTime(r.timestamp) : formatDate(r.timestamp) };
+        // Treat exact 0 as null for gas sensors so chart shows a gap, not a flat line
+        GAS_KEYS.forEach(k => { if (row[k] === 0) row[k] = null; });
+        return row;
+      });
   }, [allData, chartRange]);
 
-  const values  = chartData.map(d => d[key]).filter(v => v != null);
+  // chartData already nullifies exact zeros for gas sensors; just filter nulls here
+  const values  = chartData.map(d => d[key]).filter(v => v != null).map(Number);
   const current = values.length ? values[values.length - 1] : null;
   const avg     = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
   const min     = values.length ? Math.min(...values) : null;
   const maxVal  = values.length ? Math.max(...values) : null;
   const over    = current != null && current > threshold;
-  const prevAvg = values.length > 4 ? values.slice(0, Math.floor(values.length / 2)).reduce((a, b) => a + b, 0) / Math.floor(values.length / 2) : null;
+  // trend direction: compare second half avg vs first half avg
+  const halfLen = Math.floor(values.length / 2);
+  const prevAvg = values.length > 4 ? values.slice(0, halfLen).reduce((a, b) => a + b, 0) / halfLen : null;
   const trend   = avg && prevAvg ? (avg > prevAvg ? 'up' : 'down') : null;
-  const trendPct = avg && prevAvg ? Math.abs(((avg - prevAvg) / prevAvg) * 100).toFixed(0) : null;
+  // ncecPct: what % of the NCEC limit is the current reading?
+  const ncecPct = current != null && ncecLimit ? Math.round(current / ncecLimit * 100) : null;
 
   const fromTs = chartData[0]?.timestamp;
   const toTs   = chartData[chartData.length - 1]?.timestamp;
@@ -931,9 +941,9 @@ function GasChart({ pollutant, allData, stationName }) {
             {current != null ? current.toFixed(1) : '—'}
           </p>
           <p style={{ fontSize: 10, color: 'var(--text-faint)', margin: '2px 0 0' }}>{unit}</p>
-          {trend && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)', color: trend === 'up' ? '#DC2626' : '#16A34A', marginTop: 2 }}>
-              {trend === 'up' ? <TrendingUp size={10} /> : <TrendingDown size={10} />}{trendPct}%
+          {ncecPct != null && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)', color: ncecPct >= 100 ? '#DC2626' : ncecPct >= 80 ? '#F59E0B' : '#16A34A', marginTop: 2 }}>
+              {trend && (trend === 'up' ? <TrendingUp size={10} /> : <TrendingDown size={10} />)}{ncecPct}% NCEC
             </span>
           )}
         </div>
