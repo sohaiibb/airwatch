@@ -3,7 +3,7 @@ AirWatch Backend — FastAPI
 Polls EnggEnv, AQICN, OpenWeatherMap → stores in Supabase → WebSocket push
 """
 import os, asyncio, threading
-from datetime import datetime, timedelta, date as date_type
+from datetime import datetime, timedelta, timezone, date as date_type
 from contextlib import asynccontextmanager
 from typing import List, Optional
 
@@ -139,6 +139,18 @@ def calc_aqi(pm25):
 # Used by both live polling and backfill
 # ─────────────────────────────────────────────────────────────────────────────
 
+# EnggEnv timestamps are in AST (Arabia Standard Time, UTC+3).
+# We store all readings in UTC so the frontend can display them correctly.
+_AST_OFFSET = timedelta(hours=3)
+
+def enggenv_ts_to_utc(ts_str: str) -> str:
+    """Convert an EnggEnv 'YYYY-MM-DD HH:MM:SS' AST timestamp to a UTC ISO string."""
+    try:
+        dt_ast = datetime.strptime(ts_str.strip(), "%Y-%m-%d %H:%M:%S")
+        return (dt_ast - _AST_OFFSET).strftime("%Y-%m-%dT%H:%M:%SZ")
+    except (ValueError, AttributeError):
+        return ts_str
+
 ENGGENV_FIELD_MAP = {
     "PM2.5":         "pm25",
     "PM10":          "pm10",
@@ -168,8 +180,9 @@ def parse_enggenv_record(raw: dict, station_id: str, field_mapping: dict = None)
         except (TypeError, ValueError):
             return None
 
-    # Timestamp: "2025-12-03 19:34:23" → keep as-is for consistency with live polling
-    ts = raw.get("timestamp", datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"))
+    # EnggEnv timestamp is AST (UTC+3) — convert to UTC before storing
+    raw_ts = raw.get("timestamp", datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"))
+    ts = enggenv_ts_to_utc(raw_ts)
 
     rec = {
         "station_id":     station_id,
@@ -223,9 +236,10 @@ async def poll_enggenv(client, station):
             v = data.get(m.get(k, k))
             try: return float(v) if v is not None else None
             except (TypeError, ValueError): return None
+        raw_ts = data.get("timestamp") or datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
         return {
             "station_id":     station["id"],
-            "timestamp":      data.get("timestamp", datetime.utcnow().isoformat()),
+            "timestamp":      enggenv_ts_to_utc(raw_ts),
             "pm25":           gf("PM2.5"),
             "pm10":           gf("pm10"),
             "so2":            gf("so2"),

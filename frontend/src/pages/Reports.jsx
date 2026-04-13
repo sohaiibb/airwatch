@@ -110,10 +110,20 @@ function calcExpected(spanHours, avgPeriod) {
 }
 
 // ── Aggregation ───────────────────────────────────────────────────────────────
+const GAS_KEYS_SET = new Set(['pm25', 'pm10', 'so2', 'no2', 'o3', 'co']);
+
 function avgBucket(recs) {
   const row = {};
   COLS.forEach(c => {
-    const vals = recs.map(r => r[c.key]).filter(v => v != null && !isNaN(Number(v))).map(Number);
+    const vals = recs
+      .map(r => r[c.key])
+      .filter(v => {
+        if (v == null || isNaN(Number(v))) return false;
+        // Exact 0 for gas sensors = sensor offline/calibrating, exclude from average
+        if (GAS_KEYS_SET.has(c.key) && Number(v) === 0) return false;
+        return true;
+      })
+      .map(Number);
     row[c.key] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
   });
   return row;
@@ -178,13 +188,15 @@ function build8HourRows(readings) {
 function buildDailyRows(readings) {
   const buckets = {};
   readings.forEach(r => {
-    const key = r.timestamp.slice(0, 10);
+    // Use local date (not UTC slice) so midnight in Saudi time is the day boundary
+    const d = new Date(r.timestamp);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     if (!buckets[key]) buckets[key] = [];
     buckets[key].push(r);
   });
   return Object.entries(buckets)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([day, recs]) => ({ timestamp: day + 'T00:00:00.000Z', ...avgBucket(recs) }));
+    .map(([day, recs]) => ({ timestamp: new Date(day + 'T00:00:00').toISOString(), ...avgBucket(recs) }));
 }
 
 function buildRows(readings, avgPeriod) {
