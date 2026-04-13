@@ -23,6 +23,15 @@ function beaufortLabel(speed) {
   return 'High Wind';
 }
 
+function beaufortBars(speed) {
+  if (speed == null || speed < 0.3) return 0;
+  if (speed < 1.6) return 1;
+  if (speed < 3.4) return 2;
+  if (speed < 5.5) return 3;
+  if (speed < 8.0) return 4;
+  return 5;
+}
+
 function windDirLabel(deg) {
   if (deg == null) return '';
   const dirs = ['N','NE','E','SE','S','SW','W','NW','N'];
@@ -65,7 +74,7 @@ function PollutantCard({ pollutant, value, spark, delay = 0 }) {
 
   return (
     <div style={{
-      ...glass({ padding: '12px 14px' }),
+      ...glass({ padding: '20px 18px' }),
       animation: `glassIn 0.6s cubic-bezier(.16,1,.3,1) ${delay}s both`,
       transition: 'transform 0.3s, box-shadow 0.3s', cursor: 'default',
       display: 'flex', flexDirection: 'column',
@@ -83,7 +92,7 @@ function PollutantCard({ pollutant, value, spark, delay = 0 }) {
       </div>
 
       {/* Value */}
-      <div style={{ marginBottom: 4 }}>
+      <div style={{ marginBottom: 10 }}>
         <span style={{ fontFamily: 'var(--mono)', fontSize: 20, fontWeight: 700, color: over ? '#DC2626' : 'var(--text)', letterSpacing: '-0.02em' }}>
           {fmtVal(value)}
         </span>
@@ -91,8 +100,8 @@ function PollutantCard({ pollutant, value, spark, delay = 0 }) {
       </div>
 
       {/* Sparkline */}
-      <div style={{ margin: '0 -14px', overflow: 'hidden', flex: 1 }}>
-        <ResponsiveContainer width="100%" height={40}>
+      <div style={{ margin: '0 -18px', overflow: 'hidden', flex: 1 }}>
+        <ResponsiveContainer width="100%" height={56}>
           <AreaChart data={spark} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id={`spark-${key}`} x1="0" y1="0" x2="0" y2="1">
@@ -124,12 +133,19 @@ function PollutantCard({ pollutant, value, spark, delay = 0 }) {
   );
 }
 
+// ─── Shared met card hover handlers ────────────────────────────────────────────
+const metHover = {
+  onMouseEnter: e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 40px rgba(0,0,0,0.1)'; },
+  onMouseLeave: e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; },
+};
+const MET_H = 128; // fixed card height — all 5 met cards the same
+
 // ─── Wind Compass Card ──────────────────────────────────────────────────────────
 function WindCompassCard({ direction, speed, delay = 0 }) {
   const dir = direction ?? 0;
-  // viewBox 0 0 100 100 with circle at cx=50,cy=50,r=30 — leaves 12px padding around for labels
-  const cx = 50, cy = 50, r = 30, innerR = 18;
-  // Compass degrees: 0=N, 90=E, 180=S, 270=W
+  // viewBox 0 0 90 90: cx=45,cy=45, r=30 → circle diameter 60 of 90 → at 72px renders ~48px diameter
+  // labelR=41 → labels fit at max 86px of 90
+  const cx = 45, cy = 45, r = 30, innerR = 19;
   const cardinals = [
     { label: 'N', angle: 0 },
     { label: 'E', angle: 90 },
@@ -137,124 +153,124 @@ function WindCompassCard({ direction, speed, delay = 0 }) {
     { label: 'W', angle: 270 },
   ];
   const ticks = [0, 45, 90, 135, 180, 225, 270, 315];
-  const labelR = r + 12;
+  const labelR = r + 11;
 
   return (
     <div style={{
-      ...glass({ padding: '12px 14px' }),
+      ...glass({ padding: '14px 16px' }),
       animation: `glassIn 0.6s cubic-bezier(.16,1,.3,1) ${delay}s both`,
       transition: 'transform 0.3s, box-shadow 0.3s', cursor: 'default',
-      display: 'flex', flexDirection: 'column',
-    }}
-      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 40px rgba(0,0,0,0.1)'; }}
-      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}
-    >
-      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Wind Dir</span>
+      height: MET_H, boxSizing: 'border-box',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between',
+    }} {...metHover}>
+      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', alignSelf: 'flex-start' }}>Wind Dir</span>
 
-      {/* SVG Compass — 70×70 display, viewBox 0 0 100 100 so labels have room */}
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <svg width={70} height={70} viewBox="0 0 100 100">
-          {/* Outer ring */}
-          <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--glass-inner-border)" strokeWidth="1.5" />
-          <circle cx={cx} cy={cy} r={innerR - 2} fill="var(--glass-inner-bg)" />
+      {/* SVG Compass — 72×72 rendered, viewBox 90×90 gives 12px padding around ring for labels */}
+      <svg width={72} height={72} viewBox="0 0 90 90">
+        {/* Outer ring */}
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--glass-inner-border)" strokeWidth="1.5" />
+        <circle cx={cx} cy={cy} r={innerR - 2} fill="var(--glass-inner-bg)" />
 
-          {/* 8 tick marks */}
-          {ticks.map(deg => {
-            const rad = (deg - 90) * (Math.PI / 180);
-            const x1 = cx + (innerR - 1) * Math.cos(rad);
-            const y1 = cy + (innerR - 1) * Math.sin(rad);
-            const isCardinal = deg % 90 === 0;
-            const x2 = cx + (r - (isCardinal ? 3 : 5)) * Math.cos(rad);
-            const y2 = cy + (r - (isCardinal ? 3 : 5)) * Math.sin(rad);
-            return <line key={deg} x1={x1} y1={y1} x2={x2} y2={y2}
-              stroke={isCardinal ? 'var(--text-faint)' : 'var(--glass-inner-border)'}
-              strokeWidth={isCardinal ? 1.5 : 1} />;
-          })}
+        {/* 8 tick marks */}
+        {ticks.map(deg => {
+          const rad = (deg - 90) * (Math.PI / 180);
+          const x1 = cx + (innerR - 1) * Math.cos(rad);
+          const y1 = cy + (innerR - 1) * Math.sin(rad);
+          const isCardinal = deg % 90 === 0;
+          const x2 = cx + (r - (isCardinal ? 3 : 5)) * Math.cos(rad);
+          const y2 = cy + (r - (isCardinal ? 3 : 5)) * Math.sin(rad);
+          return <line key={deg} x1={x1} y1={y1} x2={x2} y2={y2}
+            stroke={isCardinal ? 'var(--text-faint)' : 'var(--glass-inner-border)'}
+            strokeWidth={isCardinal ? 1.5 : 1} />;
+        })}
 
-          {/* Cardinal labels — positioned outside the ring with labelR padding */}
-          {cardinals.map(({ label, angle }) => {
-            const rad = (angle - 90) * (Math.PI / 180);
-            const lx = cx + labelR * Math.cos(rad);
-            const ly = cy + labelR * Math.sin(rad);
-            return <text key={label} x={lx} y={ly + 3.5} textAnchor="middle" fontSize="9"
-              fill="var(--text-faint)" fontFamily="var(--font)" fontWeight="700">{label}</text>;
-          })}
+        {/* N/S/E/W labels — N and S bold, all outside ring */}
+        {cardinals.map(({ label, angle }) => {
+          const rad = (angle - 90) * (Math.PI / 180);
+          const lx = cx + labelR * Math.cos(rad);
+          const ly = cy + labelR * Math.sin(rad);
+          const isNS = label === 'N' || label === 'S';
+          return <text key={label} x={lx} y={ly + 4} textAnchor="middle"
+            fontSize={isNS ? '11' : '9'}
+            fontWeight={isNS ? '800' : '600'}
+            fill={isNS ? 'var(--text-mid)' : 'var(--text-faint)'}
+            fontFamily="var(--font)">{label}</text>;
+        })}
 
-          {/* Wind arrow — points FROM the direction wind is coming from */}
-          <g style={{
-            transformOrigin: `${cx}px ${cy}px`,
-            transform: `rotate(${dir}deg)`,
-            transition: 'transform 0.7s cubic-bezier(.34,1.56,.64,1)',
-          }}>
-            {/* Arrowhead pointing up */}
-            <polygon points={`${cx},${cy - innerR + 1} ${cx - 5},${cy - innerR + 10} ${cx + 5},${cy - innerR + 10}`} fill="#0d9488" />
-            {/* Arrow shaft */}
-            <line x1={cx} y1={cy - innerR + 10} x2={cx} y2={cy + 7}
-              stroke="#0d9488" strokeWidth="2.5" strokeLinecap="round" />
-            {/* Center pin */}
-            <circle cx={cx} cy={cy} r="3" fill="#0d9488" />
-          </g>
-        </svg>
+        {/* Arrow shows FLOW direction (where wind is GOING = direction + 180°) */}
+        <g style={{
+          transformOrigin: `${cx}px ${cy}px`,
+          transform: `rotate(${dir + 180}deg)`,
+          transition: 'transform 0.7s cubic-bezier(.34,1.56,.64,1)',
+        }}>
+          {/* Arrowhead */}
+          <polygon points={`${cx},${cy - innerR + 1} ${cx - 5.5},${cy - innerR + 11} ${cx + 5.5},${cy - innerR + 11}`} fill="#0d9488" />
+          {/* Shaft */}
+          <line x1={cx} y1={cy - innerR + 11} x2={cx} y2={cy + 8}
+            stroke="#0d9488" strokeWidth="3" strokeLinecap="round" />
+          {/* Center pin */}
+          <circle cx={cx} cy={cy} r="3.5" fill="#0d9488" />
+        </g>
+      </svg>
+
+      {/* Direction value + "Wind from X" */}
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
+          {direction != null ? `${Math.round(direction)}° ${windDirLabel(direction)}` : '—'}
+        </div>
+        <div style={{ fontSize: 9, color: 'var(--text-faint)', marginTop: 1 }}>
+          {direction != null ? `Wind from ${windDirLabel(direction)}` : ''}
+        </div>
       </div>
-
-      {/* Direction text */}
-      <span style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 700, color: 'var(--text)', marginTop: 4, textAlign: 'center' }}>
-        {direction != null ? `${Math.round(direction)}° ${windDirLabel(direction)}` : '—'}
-      </span>
-      <span style={{ fontSize: 9, color: 'var(--text-faint)', marginTop: 1, textAlign: 'center' }}>
-        {speed != null ? `${fmtVal(speed)} m/s · ${beaufortLabel(speed)}` : '—'}
-      </span>
     </div>
   );
 }
 
-// ─── Temperature Card (with thermometer bar) ───────────────────────────────────
+// ─── Temperature Card ───────────────────────────────────────────────────────────
 function ThermometerCard({ value, low, high, delay = 0 }) {
   const temp = value ?? 0;
-  const fillPct = Math.max(0, Math.min(1, temp / 50));
-  const fillH = Math.round(fillPct * 32); // max 32px fill inside 36px track
+  // Track 40px tall, fill scales 0–50°C
+  const fillH = Math.round(Math.max(0, Math.min(1, temp / 50)) * 40);
+  const bulbColor = temp > 40 ? '#ef4444' : temp > 25 ? '#f97316' : '#3b82f6';
 
   return (
     <div style={{
-      ...glass({ padding: '12px 14px' }),
+      ...glass({ padding: '14px 16px' }),
       animation: `glassIn 0.6s cubic-bezier(.16,1,.3,1) ${delay}s both`,
       transition: 'transform 0.3s, box-shadow 0.3s', cursor: 'default',
-    }}
-      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 40px rgba(0,0,0,0.1)'; }}
-      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {/* Thermometer SVG */}
-        <svg width={14} height={48} viewBox="0 0 14 48" style={{ flexShrink: 0 }}>
-          <defs>
-            <linearGradient id="thermo-grad" x1="0" y1="1" x2="0" y2="0" gradientUnits="objectBoundingBox">
-              <stop offset="0%" stopColor="#60A5FA" />
-              <stop offset="60%" stopColor="#FBBF24" />
-              <stop offset="100%" stopColor="#EF4444" />
-            </linearGradient>
-          </defs>
-          {/* Track */}
-          <rect x="5" y="2" width="4" height="36" rx="2" fill="rgba(0,0,0,0.07)" />
-          {/* Fill (from bottom up) */}
-          {fillH > 0 && (
-            <rect x="5" y={38 - fillH} width="4" height={fillH} rx="2"
-              fill="url(#thermo-grad)"
-              style={{ transition: 'height 1s cubic-bezier(.16,1,.3,1), y 1s cubic-bezier(.16,1,.3,1)' }} />
-          )}
-          {/* Bulb */}
-          <circle cx="7" cy="43" r="5" fill={value != null && value > 40 ? '#EF4444' : value != null && value > 30 ? '#FBBF24' : '#60A5FA'} />
-          <circle cx="7" cy="43" r="3" fill="rgba(255,255,255,0.35)" />
-        </svg>
+      height: MET_H, boxSizing: 'border-box',
+      display: 'flex', flexDirection: 'column', justifyContent: 'center',
+    }} {...metHover}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {/* Thermometer in 40px container */}
+        <div style={{ width: 40, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+          <svg width={14} height={64} viewBox="0 0 14 64">
+            <defs>
+              <linearGradient id="thermo-grad" x1="0" y1="1" x2="0" y2="0" gradientUnits="objectBoundingBox">
+                <stop offset="0%"   stopColor="#3b82f6" />
+                <stop offset="50%"  stopColor="#f97316" />
+                <stop offset="100%" stopColor="#ef4444" />
+              </linearGradient>
+            </defs>
+            {/* Track */}
+            <rect x="5" y="2" width="4" height="42" rx="2" fill="#e5e7eb" />
+            {/* Fill from bottom */}
+            {fillH > 0 && <rect x="5" y={44 - fillH} width="4" height={fillH} rx="2" fill="url(#thermo-grad)" />}
+            {/* Bulb */}
+            <circle cx="7" cy="57" r="7" fill={bulbColor} />
+            <circle cx="7" cy="57" r="4.5" fill="rgba(255,255,255,0.28)" />
+          </svg>
+        </div>
 
-        {/* Value + range */}
-        <div style={{ flex: 1 }}>
+        {/* Text */}
+        <div style={{ flex: 1, minWidth: 0 }}>
           <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Temperature</span>
-          <div style={{ marginTop: 2 }}>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{fmtVal(value)}</span>
-            <span style={{ fontSize: 9, color: 'var(--text-faint)', marginLeft: 3 }}>°C</span>
+          <div style={{ marginTop: 4 }}>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 22, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{fmtVal(value)}</span>
+            <span style={{ fontSize: 10, color: 'var(--text-faint)', marginLeft: 3 }}>°C</span>
           </div>
-          <div style={{ fontSize: 9, color: 'var(--text-faint)', marginTop: 3, fontFamily: 'var(--mono)' }}>
-            {low != null && high != null ? `Low ${low} · High ${high}` : 'No range data'}
+          <div style={{ fontSize: 9, color: 'var(--text-faint)', marginTop: 4, fontFamily: 'var(--mono)' }}>
+            {low != null && high != null ? `Low ${low} · High ${high}` : '—'}
           </div>
         </div>
       </div>
@@ -262,47 +278,51 @@ function ThermometerCard({ value, low, high, delay = 0 }) {
   );
 }
 
-// ─── Humidity Card (with droplet fill) ─────────────────────────────────────────
+// ─── Humidity Card ─────────────────────────────────────────────────────────────
 function HumidityCard({ value, low, high, delay = 0 }) {
   const pct = Math.max(0, Math.min(100, value ?? 0));
-  // Droplet SVG path (24×30 viewBox)
+  // Teardrop path in 24×30 viewBox (0,0 to 24,30)
   const dropPath = 'M 12,28 C 18,28 22,22 22,16 C 22,9 12,1 12,1 C 12,1 2,9 2,16 C 2,22 6,28 12,28 Z';
-  const fillY = 29 - (pct / 100) * 28; // from 1 (full) to 29 (empty)
+  // fillY: at pct=0 → rect starts at 28 (empty); at pct=100 → rect starts at 1 (full)
+  const fillY = 28 - (pct / 100) * 27;
 
   return (
     <div style={{
-      ...glass({ padding: '12px 14px' }),
+      ...glass({ padding: '14px 16px' }),
       animation: `glassIn 0.6s cubic-bezier(.16,1,.3,1) ${delay}s both`,
       transition: 'transform 0.3s, box-shadow 0.3s', cursor: 'default',
-    }}
-      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 40px rgba(0,0,0,0.1)'; }}
-      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {/* Droplet SVG */}
-        <svg width={24} height={30} viewBox="0 0 24 30" style={{ flexShrink: 0 }}>
-          <defs>
-            <clipPath id="drop-clip">
-              <path d={dropPath} />
-            </clipPath>
-          </defs>
-          {/* Outline */}
-          <path d={dropPath} fill="none" stroke="var(--text-faint)" strokeWidth="1.2" opacity="0.4" />
-          {/* Fill from bottom */}
-          <rect x="0" y={fillY} width="24" height={30 - fillY}
-            fill="#0EA5E9" opacity="0.65" clipPath="url(#drop-clip)"
-            style={{ transition: 'y 1s cubic-bezier(.16,1,.3,1), height 1s cubic-bezier(.16,1,.3,1)' }} />
-        </svg>
+      height: MET_H, boxSizing: 'border-box',
+      display: 'flex', flexDirection: 'column', justifyContent: 'center',
+    }} {...metHover}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {/* Droplet in 40px container */}
+        <div style={{ width: 40, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+          <svg width={24} height={30} viewBox="0 0 24 30">
+            <defs>
+              <clipPath id="drop-clip">
+                <path d={dropPath} />
+              </clipPath>
+            </defs>
+            {/* Gray background */}
+            <path d={dropPath} fill="#e5e7eb" />
+            {/* Blue fill from bottom */}
+            <rect x="0" y={fillY} width="24" height={30 - fillY}
+              fill="#0ea5e9" clipPath="url(#drop-clip)"
+              style={{ transition: 'y 1s cubic-bezier(.16,1,.3,1), height 1s cubic-bezier(.16,1,.3,1)' }} />
+            {/* Outline */}
+            <path d={dropPath} fill="none" stroke="rgba(0,0,0,0.10)" strokeWidth="0.8" />
+          </svg>
+        </div>
 
-        {/* Value + range */}
-        <div style={{ flex: 1 }}>
+        {/* Text */}
+        <div style={{ flex: 1, minWidth: 0 }}>
           <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Humidity</span>
-          <div style={{ marginTop: 2 }}>
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{fmtVal(value, 0)}</span>
-            <span style={{ fontSize: 9, color: 'var(--text-faint)', marginLeft: 3 }}>%</span>
+          <div style={{ marginTop: 4 }}>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 22, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{fmtVal(value, 0)}</span>
+            <span style={{ fontSize: 10, color: 'var(--text-faint)', marginLeft: 3 }}>%</span>
           </div>
-          <div style={{ fontSize: 9, color: 'var(--text-faint)', marginTop: 3, fontFamily: 'var(--mono)' }}>
-            {low != null && high != null ? `Low ${low} · High ${high}` : 'No range data'}
+          <div style={{ fontSize: 9, color: 'var(--text-faint)', marginTop: 4, fontFamily: 'var(--mono)' }}>
+            {low != null && high != null ? `Low ${low} · High ${high}` : '—'}
           </div>
         </div>
       </div>
@@ -310,110 +330,91 @@ function HumidityCard({ value, low, high, delay = 0 }) {
   );
 }
 
-// ─── Pressure Card (barometer gauge) ───────────────────────────────────────────
+// ─── Pressure Card (barometer arc) ─────────────────────────────────────────────
 function PressureCard({ value, low, high, delay = 0 }) {
-  // Semicircle arc 980–1040 hPa. viewBox 0 0 160 84 leaves room for labels outside arc.
-  const cx = 80, cy = 66, r = 50;
+  // Semicircle 980–1040 hPa. Small viewBox keeps it proportionate in the fixed-height card.
+  const cx = 60, cy = 50, r = 38;
   const gaugeMin = 980, gaugeMax = 1040;
   const fraction = value != null ? Math.max(0, Math.min(1, (value - gaugeMin) / (gaugeMax - gaugeMin))) : 0.5;
-  // needleAngleDeg: -90°=left(980), 0°=up(1010), +90°=right(1040)
   const needleAngleDeg = (fraction - 0.5) * 180;
 
-  // Point on the semicircle arc for a given hPa value
   const arcAngle = (val) => Math.PI - ((val - gaugeMin) / (gaugeMax - gaugeMin)) * Math.PI;
   const arcPt = (val) => {
     const a = arcAngle(val);
     return { x: cx + r * Math.cos(a), y: cy - r * Math.sin(a) };
   };
-  const p980  = arcPt(980);
-  const p1000 = arcPt(1000);
-  const p1020 = arcPt(1020);
-  const p1040 = arcPt(1040);
+  const p980 = arcPt(980), p1000 = arcPt(1000), p1020 = arcPt(1020), p1040 = arcPt(1040);
 
-  // Label positions outside the arc (labelR > r)
-  const labelR = r + 13;
+  // Labels outside arc at labelR
+  const labelR = r + 10;
   const lblPt = (val) => {
     const a = arcAngle(val);
     return { x: cx + labelR * Math.cos(a), y: cy - labelR * Math.sin(a) };
   };
-  const l980  = lblPt(980);
-  const l1000 = lblPt(1000);
-  const l1020 = lblPt(1020);
-  const l1040 = lblPt(1040);
+  const l980 = lblPt(980), l1000 = lblPt(1000), l1020 = lblPt(1020), l1040 = lblPt(1040);
 
   const status = pressureStatus(value);
   const statusColor = status === 'Low' ? '#3B82F6' : status === 'High' ? '#F59E0B' : '#16A34A';
 
   return (
     <div style={{
-      ...glass({ padding: '12px 14px' }),
+      ...glass({ padding: '14px 16px' }),
       animation: `glassIn 0.6s cubic-bezier(.16,1,.3,1) ${delay}s both`,
       transition: 'transform 0.3s, box-shadow 0.3s', cursor: 'default',
-    }}
-      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 40px rgba(0,0,0,0.1)'; }}
-      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
-        <Gauge size={11} color="var(--text-muted)" />
-        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Pressure</span>
-      </div>
+      height: MET_H, boxSizing: 'border-box',
+      display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+    }} {...metHover}>
+      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Pressure</span>
 
-      {/* Barometer arc — width 100% scales to card, viewBox has room for all labels */}
-      <svg width="100%" viewBox="0 0 160 84" style={{ display: 'block', overflow: 'visible' }}>
+      {/* Arc gauge — fixed 120×66 SVG, viewBox proportioned to avoid clipping */}
+      <svg width={120} height={66} viewBox="0 0 120 66" style={{ display: 'block', margin: '0 auto' }}>
         {/* Background track */}
         <path d={`M ${p980.x.toFixed(1)},${p980.y.toFixed(1)} A ${r},${r} 0 0 1 ${p1040.x.toFixed(1)},${p1040.y.toFixed(1)}`}
-          fill="none" stroke="rgba(0,0,0,0.07)" strokeWidth="6" strokeLinecap="round" />
-
-        {/* Blue zone: 980–1000 (Low) */}
+          fill="none" stroke="rgba(0,0,0,0.07)" strokeWidth="5" strokeLinecap="round" />
+        {/* Blue zone 980–1000 */}
         <path d={`M ${p980.x.toFixed(1)},${p980.y.toFixed(1)} A ${r},${r} 0 0 1 ${p1000.x.toFixed(1)},${p1000.y.toFixed(1)}`}
-          fill="none" stroke="#3b82f6" strokeWidth="6" strokeLinecap="round" opacity="0.65" />
-        {/* Green zone: 1000–1020 (Normal) */}
+          fill="none" stroke="#3b82f6" strokeWidth="5" strokeLinecap="round" opacity="0.7" />
+        {/* Green zone 1000–1020 */}
         <path d={`M ${p1000.x.toFixed(1)},${p1000.y.toFixed(1)} A ${r},${r} 0 0 1 ${p1020.x.toFixed(1)},${p1020.y.toFixed(1)}`}
-          fill="none" stroke="#10b981" strokeWidth="6" strokeLinecap="round" opacity="0.65" />
-        {/* Orange zone: 1020–1040 (High) */}
+          fill="none" stroke="#10b981" strokeWidth="5" strokeLinecap="round" opacity="0.7" />
+        {/* Orange zone 1020–1040 */}
         <path d={`M ${p1020.x.toFixed(1)},${p1020.y.toFixed(1)} A ${r},${r} 0 0 1 ${p1040.x.toFixed(1)},${p1040.y.toFixed(1)}`}
-          fill="none" stroke="#f59e0b" strokeWidth="6" strokeLinecap="round" opacity="0.65" />
-
+          fill="none" stroke="#f59e0b" strokeWidth="5" strokeLinecap="round" opacity="0.7" />
         {/* Zone divider ticks */}
         {[1000, 1020].map(v => {
           const a = arcAngle(v);
           const ox = cx + r * Math.cos(a), oy = cy - r * Math.sin(a);
-          const ix = cx + (r - 8) * Math.cos(a), iy = cy - (r - 8) * Math.sin(a);
+          const ix = cx + (r - 7) * Math.cos(a), iy = cy - (r - 7) * Math.sin(a);
           return <line key={v} x1={ox.toFixed(1)} y1={oy.toFixed(1)} x2={ix.toFixed(1)} y2={iy.toFixed(1)}
-            stroke="rgba(255,255,255,0.75)" strokeWidth="1.5" />;
+            stroke="rgba(255,255,255,0.8)" strokeWidth="1.5" />;
         })}
-
-        {/* Needle — rotates via CSS transform around pivot (cx, cy) */}
+        {/* Needle */}
         <g style={{
           transformOrigin: `${cx}px ${cy}px`,
           transform: `rotate(${needleAngleDeg}deg)`,
           transition: 'transform 0.8s cubic-bezier(.34,1.56,.64,1)',
         }}>
-          <line x1={cx} y1={cy} x2={cx} y2={cy - r + 8}
-            stroke="var(--text-mid)" strokeWidth="2" strokeLinecap="round" opacity="0.8" />
-          <polygon points={`${cx},${cy - r + 3} ${cx - 3.5},${cy - r + 12} ${cx + 3.5},${cy - r + 12}`}
+          <line x1={cx} y1={cy} x2={cx} y2={cy - r + 7}
+            stroke="var(--text-mid)" strokeWidth="1.8" strokeLinecap="round" opacity="0.8" />
+          <polygon points={`${cx},${cy - r + 3} ${cx - 3},${cy - r + 10} ${cx + 3},${cy - r + 10}`}
             fill="var(--text-mid)" opacity="0.8" />
         </g>
-        {/* Pivot circles */}
-        <circle cx={cx} cy={cy} r="5" fill="var(--text-mid)" opacity="0.55" />
-        <circle cx={cx} cy={cy} r="2.5" fill="var(--glass-inner-bg)" />
-
-        {/* Scale labels outside arc — 980, 1000, 1020, 1040 */}
-        <text x={l980.x.toFixed(1)} y={(l980.y + 3.5).toFixed(1)} fontSize="7.5" fill="var(--text-faint)" fontFamily="var(--font)" textAnchor="end">980</text>
-        <text x={l1000.x.toFixed(1)} y={(l1000.y + 3.5).toFixed(1)} fontSize="7.5" fill="var(--text-faint)" fontFamily="var(--font)" textAnchor="middle">1000</text>
-        <text x={l1020.x.toFixed(1)} y={(l1020.y + 3.5).toFixed(1)} fontSize="7.5" fill="var(--text-faint)" fontFamily="var(--font)" textAnchor="middle">1020</text>
-        <text x={l1040.x.toFixed(1)} y={(l1040.y + 3.5).toFixed(1)} fontSize="7.5" fill="var(--text-faint)" fontFamily="var(--font)" textAnchor="start">1040</text>
+        <circle cx={cx} cy={cy} r="4.5" fill="var(--text-mid)" opacity="0.5" />
+        <circle cx={cx} cy={cy} r="2" fill="var(--glass-inner-bg)" />
+        {/* Scale labels */}
+        <text x={l980.x.toFixed(1)} y={(l980.y + 3).toFixed(1)} fontSize="7" fill="var(--text-faint)" fontFamily="var(--font)" textAnchor="end">980</text>
+        <text x={l1000.x.toFixed(1)} y={(l1000.y - 1).toFixed(1)} fontSize="7" fill="var(--text-faint)" fontFamily="var(--font)" textAnchor="middle">1000</text>
+        <text x={l1020.x.toFixed(1)} y={(l1020.y - 1).toFixed(1)} fontSize="7" fill="var(--text-faint)" fontFamily="var(--font)" textAnchor="middle">1020</text>
+        <text x={l1040.x.toFixed(1)} y={(l1040.y + 3).toFixed(1)} fontSize="7" fill="var(--text-faint)" fontFamily="var(--font)" textAnchor="start">1040</text>
       </svg>
 
-      {/* Value + status */}
-      <div style={{ textAlign: 'center', marginTop: 0 }}>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>{fmtVal(value, 1)}</span>
-        <span style={{ fontSize: 9, color: 'var(--text-faint)', marginLeft: 3 }}>hPa</span>
+      {/* Value + status + range */}
+      <div style={{ textAlign: 'center' }}>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{fmtVal(value, 1)}</span>
+        <span style={{ fontSize: 9, color: 'var(--text-faint)', marginLeft: 2 }}>hPa</span>
+        <span style={{ fontSize: 10, fontWeight: 700, color: statusColor, marginLeft: 6 }}>{status}</span>
       </div>
-      <div style={{ textAlign: 'center', marginTop: 3 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: statusColor }}>{status}</span>
-      </div>
-      <div style={{ textAlign: 'center', marginTop: 2 }}>
+      <div style={{ textAlign: 'center' }}>
         <span style={{ fontSize: 9, color: 'var(--text-faint)', fontFamily: 'var(--mono)' }}>
           {low != null && high != null ? `Low ${low} · High ${high}` : ''}
         </span>
@@ -424,28 +425,43 @@ function PressureCard({ value, low, high, delay = 0 }) {
 
 // ─── Wind Speed Card ────────────────────────────────────────────────────────────
 function WindSpeedCard({ value, low, high, delay = 0 }) {
+  const filled = beaufortBars(value);
+  const barHeights = [8, 14, 20, 26, 32];
+
   return (
     <div style={{
-      ...glass({ padding: '12px 14px' }),
+      ...glass({ padding: '14px 16px' }),
       animation: `glassIn 0.6s cubic-bezier(.16,1,.3,1) ${delay}s both`,
       transition: 'transform 0.3s, box-shadow 0.3s', cursor: 'default',
-    }}
-      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 40px rgba(0,0,0,0.1)'; }}
-      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-        <div style={{ width: 26, height: 26, borderRadius: 8, background: '#8B5CF618', border: '1px solid #8B5CF625', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Wind size={13} color="#8B5CF6" />
+      height: MET_H, boxSizing: 'border-box',
+      display: 'flex', flexDirection: 'column', justifyContent: 'center',
+    }} {...metHover}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {/* Wind strength bars in 40px container */}
+        <div style={{ width: 40, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3 }}>
+            {barHeights.map((h, i) => (
+              <div key={i} style={{
+                width: 4, height: h, borderRadius: 2,
+                background: i < filled ? '#0d9488' : '#e5e7eb',
+                transition: 'background 0.5s ease',
+              }} />
+            ))}
+          </div>
         </div>
-        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Wind Speed</span>
-      </div>
-      <div>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{fmtVal(value)}</span>
-        <span style={{ fontSize: 9, color: 'var(--text-faint)', marginLeft: 3 }}>m/s</span>
-      </div>
-      <div style={{ fontSize: 9, color: 'var(--text-faint)', marginTop: 4, fontFamily: 'var(--mono)' }}>
-        {value != null ? beaufortLabel(value) : '—'}
-        {low != null && high != null ? ` · ${low}–${high} m/s` : ''}
+
+        {/* Text */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Wind Speed</span>
+          <div style={{ marginTop: 4 }}>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 22, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{fmtVal(value)}</span>
+            <span style={{ fontSize: 10, color: 'var(--text-faint)', marginLeft: 3 }}>m/s</span>
+          </div>
+          <div style={{ fontSize: 9, color: 'var(--text-faint)', marginTop: 4, fontFamily: 'var(--mono)' }}>
+            {value != null ? beaufortLabel(value) : '—'}
+            {low != null && high != null ? ` · ${low}–${high}` : ''}
+          </div>
+        </div>
       </div>
     </div>
   );
