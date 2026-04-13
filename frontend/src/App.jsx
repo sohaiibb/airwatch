@@ -138,12 +138,11 @@ function AppInner({ profile, session, onLogout }) {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', position: 'relative', overflow: 'hidden' }}>
-      {/* Ambient orbs */}
+      {/* Ambient orbs — very subtle teal/blue tints only, no warm colors */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
-        <div style={{ position: 'absolute', top: '-10%', right: '-5%', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle, rgba(59,130,246,0.10), transparent 70%)', animation: 'float1 25s ease-in-out infinite', filter: 'blur(40px)' }} />
-        <div style={{ position: 'absolute', bottom: '-10%', left: '-8%', width: 700, height: 700, borderRadius: '50%', background: 'radial-gradient(circle, rgba(16,185,129,0.08), transparent 70%)', animation: 'float2 30s ease-in-out infinite', filter: 'blur(50px)' }} />
-        <div style={{ position: 'absolute', top: '40%', left: '50%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(168,85,247,0.06), transparent 60%)', animation: 'float3 20s ease-in-out infinite', filter: 'blur(35px)' }} />
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, #10B981, #3B82F6, #8B5CF6, #EC4899, #F59E0B, #10B981)', backgroundSize: '200% 100%', animation: 'shimmer 8s linear infinite', opacity: 0.5 }} />
+        <div style={{ position: 'absolute', top: '-10%', right: '-5%', width: 700, height: 700, borderRadius: '50%', background: 'radial-gradient(circle, rgba(59,130,246,0.02), transparent 70%)', filter: 'blur(60px)' }} />
+        <div style={{ position: 'absolute', bottom: '-10%', left: '-8%', width: 800, height: 800, borderRadius: '50%', background: 'radial-gradient(circle, rgba(13,148,136,0.015), transparent 70%)', filter: 'blur(70px)' }} />
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, #10B981, #3B82F6, #8B5CF6, #EC4899, #F59E0B, #10B981)', backgroundSize: '200% 100%', animation: 'shimmer 8s linear infinite', opacity: 0.35 }} />
       </div>
 
       {/* Mobile hamburger */}

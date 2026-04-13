@@ -1431,7 +1431,7 @@ export default function Charts({ profile }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, fontFamily: 'var(--font-mono)', minWidth: 800 }}>
             <thead>
               <tr>
-                <th style={{ ...thStyle('timestamp'), position: 'sticky', left: 0, zIndex: 2, background: sortKey === 'timestamp' ? 'rgba(240,237,233,0.95)' : 'rgba(232,228,222,0.95)' }} onClick={() => handleSort('timestamp')}>
+                <th style={{ ...thStyle('timestamp'), position: 'sticky', left: 0, zIndex: 2, background: sortKey === 'timestamp' ? 'rgba(241,245,249,0.97)' : 'rgba(248,250,251,0.97)' }} onClick={() => handleSort('timestamp')}>
                   Timestamp <SortArrow col="timestamp" sortKey={sortKey} sortDir={sortDir} />
                 </th>
                 {showCount && <th style={thStyle('count')} onClick={() => handleSort('count')}># <SortArrow col="count" sortKey={sortKey} sortDir={sortDir} /></th>}
