@@ -2,7 +2,7 @@
 AirWatch Backend — FastAPI
 Polls EnggEnv, AQICN, OpenWeatherMap → stores in Supabase → WebSocket push
 """
-import os, asyncio
+import os, asyncio, threading
 from datetime import datetime, timedelta, date as date_type
 from contextlib import asynccontextmanager
 from typing import List, Optional
@@ -17,11 +17,106 @@ from alerts import AlertEngine
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+DATABASE_URL = os.getenv("DATABASE_URL", "")   # optional: for auto-migration
 AQICN_TOKEN  = os.getenv("AQICN_TOKEN", "")
 OWM_KEY      = os.getenv("OWM_API_KEY", "")
 
 sb = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL else None
 alert_engine = AlertEngine(sb) if sb else None
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Alert table migration — runs at startup if DATABASE_URL is set
+# ─────────────────────────────────────────────────────────────────────────────
+
+ALERT_MIGRATION_SQL = """
+CREATE TABLE IF NOT EXISTS alert_events (
+  id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  station_id       UUID        NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
+  pollutant        TEXT        NOT NULL,
+  period           TEXT        NOT NULL,
+  status           TEXT        NOT NULL DEFAULT 'warning',
+  measured_value   NUMERIC,
+  threshold        NUMERIC     NOT NULL,
+  warning_pct      INTEGER     DEFAULT 80,
+  started_at       TIMESTAMPTZ DEFAULT NOW(),
+  last_notified_at TIMESTAMPTZ,
+  cleared_at       TIMESTAMPTZ,
+  peak_value       NUMERIC,
+  peak_at          TIMESTAMPTZ,
+  hour_count       INTEGER     DEFAULT 0,
+  created_at       TIMESTAMPTZ DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS alert_log (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id   UUID REFERENCES alert_events(id) ON DELETE SET NULL,
+  station_id UUID NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
+  action     TEXT NOT NULL,
+  details    JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS alert_subscribers (
+  id               UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+  station_id       UUID    REFERENCES stations(id) ON DELETE CASCADE,
+  email            TEXT    NOT NULL,
+  name             TEXT,
+  whatsapp_number  TEXT,
+  email_enabled    BOOLEAN DEFAULT TRUE,
+  whatsapp_enabled BOOLEAN DEFAULT FALSE,
+  role             TEXT    DEFAULT 'client',
+  created_at       TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS system_settings (
+  key        TEXT PRIMARY KEY,
+  value      JSONB NOT NULL DEFAULT '{}',
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+INSERT INTO system_settings (key, value)
+VALUES ('email_config', '{"provider": null, "configured": false}')
+ON CONFLICT (key) DO NOTHING;
+INSERT INTO alert_rules (station_id, pollutant, period, threshold, warning_pct, enabled, is_custom)
+VALUES
+  (NULL,'pm25','24-hour',35,80,TRUE,FALSE),(NULL,'pm10','24-hour',340,80,TRUE,FALSE),
+  (NULL,'so2','1-hour',441,80,TRUE,FALSE),(NULL,'so2','24-hour',217,80,TRUE,FALSE),
+  (NULL,'no2','1-hour',200,80,TRUE,FALSE),(NULL,'o3','8-hour',157,80,TRUE,FALSE),
+  (NULL,'co','1-hour',40000,80,TRUE,FALSE),(NULL,'co','8-hour',10000,80,TRUE,FALSE)
+ON CONFLICT DO NOTHING;
+"""
+
+def run_alert_migration():
+    """Auto-create missing alert tables if DATABASE_URL is configured."""
+    if not DATABASE_URL:
+        return
+    try:
+        import psycopg2
+        conn = psycopg2.connect(DATABASE_URL)
+        conn.autocommit = True
+        cur = conn.cursor()
+        cur.execute(ALERT_MIGRATION_SQL)
+        cur.close()
+        conn.close()
+        print("[Migrate] ✓ Alert tables verified/created via DATABASE_URL")
+    except Exception as e:
+        print(f"[Migrate] WARNING: Could not auto-migrate alert tables: {e}")
+
+def check_alert_db_health() -> dict:
+    """Check whether alert tables exist. Returns status dict."""
+    if not sb:
+        return {"healthy": False, "reason": "Supabase not connected"}
+    missing = []
+    for tbl in ["alert_events", "alert_log", "alert_rules", "alert_subscribers"]:
+        try:
+            sb.table(tbl).select("id").limit(1).execute()
+        except Exception:
+            missing.append(tbl)
+    if missing:
+        return {
+            "healthy": False,
+            "missing_tables": missing,
+            "fix": "Run database/alerts_schema.sql in the Supabase SQL editor, "
+                   "or set DATABASE_URL env var for auto-migration.",
+        }
+    return {"healthy": True, "tables": ["alert_events", "alert_log", "alert_rules", "alert_subscribers"]}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # AQI calculation (US EPA PM2.5 breakpoints)
@@ -229,6 +324,21 @@ scheduler = AsyncIOScheduler()
 
 @asynccontextmanager
 async def lifespan(app):
+    # Auto-migrate alert tables if DATABASE_URL is set
+    run_alert_migration()
+
+    # Startup DB health check — log clearly if tables are missing
+    health = check_alert_db_health()
+    if not health["healthy"]:
+        print("\n" + "="*60)
+        print("[ALERT ENGINE] ⚠️  DATABASE TABLES MISSING")
+        print(f"  Missing: {health.get('missing_tables', [])}")
+        print(f"  Fix: Run database/alerts_schema.sql in the Supabase SQL editor")
+        print(f"  OR:  Set DATABASE_URL env var for auto-migration on next restart")
+        print("="*60 + "\n")
+    else:
+        print("[ALERT ENGINE] ✓ All alert tables present")
+
     pi = int(os.getenv("POLL_INTERVAL", "300"))
     asyncio.create_task(poll_all())
     scheduler.add_job(poll_all, "interval", seconds=pi)
@@ -255,6 +365,11 @@ def root(): return {"name": "AirWatch API", "version": "2.1.0"}
 
 @app.get("/health")
 def health(): return {"status": "healthy", "supabase": bool(sb), "aqicn": bool(AQICN_TOKEN)}
+
+@app.get("/api/alerts/db-health")
+def alerts_db_health():
+    """Check whether alert tables exist and alert engine is functional."""
+    return check_alert_db_health()
 
 @app.post("/api/poll")
 async def trigger_poll():
