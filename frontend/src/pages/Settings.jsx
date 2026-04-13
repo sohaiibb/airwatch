@@ -507,7 +507,7 @@ export default function Settings({ profile }) {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ maxWidth: 1100 }}>
+    <div style={{ width: '100%' }}>
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: isMobile ? 22 : 26, fontWeight: 800, letterSpacing: '-0.03em', margin: 0 }}>Settings</h1>

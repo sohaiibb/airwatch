@@ -127,75 +127,81 @@ function PollutantCard({ pollutant, value, spark, delay = 0 }) {
 // ─── Wind Compass Card ──────────────────────────────────────────────────────────
 function WindCompassCard({ direction, speed, delay = 0 }) {
   const dir = direction ?? 0;
-  const cx = 35, cy = 35, r = 28, innerR = 20;
+  // viewBox 0 0 100 100 with circle at cx=50,cy=50,r=30 — leaves 12px padding around for labels
+  const cx = 50, cy = 50, r = 30, innerR = 18;
+  // Compass degrees: 0=N, 90=E, 180=S, 270=W
   const cardinals = [
-    { label: 'N', angle: 270 },
-    { label: 'E', angle: 0 },
-    { label: 'S', angle: 90 },
-    { label: 'W', angle: 180 },
+    { label: 'N', angle: 0 },
+    { label: 'E', angle: 90 },
+    { label: 'S', angle: 180 },
+    { label: 'W', angle: 270 },
   ];
   const ticks = [0, 45, 90, 135, 180, 225, 270, 315];
+  const labelR = r + 12;
 
   return (
     <div style={{
       ...glass({ padding: '12px 14px' }),
       animation: `glassIn 0.6s cubic-bezier(.16,1,.3,1) ${delay}s both`,
       transition: 'transform 0.3s, box-shadow 0.3s', cursor: 'default',
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      display: 'flex', flexDirection: 'column',
     }}
       onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 40px rgba(0,0,0,0.1)'; }}
       onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}
     >
-      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Wind Dir</span>
+      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Wind Dir</span>
 
-      {/* SVG Compass */}
-      <svg width={70} height={70} viewBox="0 0 70 70">
-        {/* Outer ring */}
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--glass-inner-border)" strokeWidth="1.5" />
-        <circle cx={cx} cy={cy} r={innerR - 2} fill="var(--glass-inner-bg)" />
+      {/* SVG Compass — 70×70 display, viewBox 0 0 100 100 so labels have room */}
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <svg width={70} height={70} viewBox="0 0 100 100">
+          {/* Outer ring */}
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--glass-inner-border)" strokeWidth="1.5" />
+          <circle cx={cx} cy={cy} r={innerR - 2} fill="var(--glass-inner-bg)" />
 
-        {/* 8 tick marks */}
-        {ticks.map(deg => {
-          const rad = (deg - 90) * (Math.PI / 180);
-          const x1 = cx + (innerR + 1) * Math.cos(rad);
-          const y1 = cy + (innerR + 1) * Math.sin(rad);
-          const isCardinal = deg % 90 === 0;
-          const x2 = cx + (r - (isCardinal ? 4 : 6)) * Math.cos(rad);
-          const y2 = cy + (r - (isCardinal ? 4 : 6)) * Math.sin(rad);
-          return <line key={deg} x1={x1} y1={y1} x2={x2} y2={y2}
-            stroke={isCardinal ? 'var(--text-faint)' : 'var(--glass-inner-border)'}
-            strokeWidth={isCardinal ? 1.5 : 1} />;
-        })}
+          {/* 8 tick marks */}
+          {ticks.map(deg => {
+            const rad = (deg - 90) * (Math.PI / 180);
+            const x1 = cx + (innerR - 1) * Math.cos(rad);
+            const y1 = cy + (innerR - 1) * Math.sin(rad);
+            const isCardinal = deg % 90 === 0;
+            const x2 = cx + (r - (isCardinal ? 3 : 5)) * Math.cos(rad);
+            const y2 = cy + (r - (isCardinal ? 3 : 5)) * Math.sin(rad);
+            return <line key={deg} x1={x1} y1={y1} x2={x2} y2={y2}
+              stroke={isCardinal ? 'var(--text-faint)' : 'var(--glass-inner-border)'}
+              strokeWidth={isCardinal ? 1.5 : 1} />;
+          })}
 
-        {/* Cardinal labels */}
-        {cardinals.map(({ label, angle }) => {
-          const rad = (angle - 90) * (Math.PI / 180);
-          const lx = cx + (r + 7) * Math.cos(rad);
-          const ly = cy + (r + 7) * Math.sin(rad);
-          return <text key={label} x={lx} y={ly + 3.5} textAnchor="middle" fontSize="8"
-            fill="var(--text-faint)" fontFamily="var(--font)" fontWeight="600">{label}</text>;
-        })}
+          {/* Cardinal labels — positioned outside the ring with labelR padding */}
+          {cardinals.map(({ label, angle }) => {
+            const rad = (angle - 90) * (Math.PI / 180);
+            const lx = cx + labelR * Math.cos(rad);
+            const ly = cy + labelR * Math.sin(rad);
+            return <text key={label} x={lx} y={ly + 3.5} textAnchor="middle" fontSize="9"
+              fill="var(--text-faint)" fontFamily="var(--font)" fontWeight="700">{label}</text>;
+          })}
 
-        {/* Needle (animated via CSS transform) */}
-        <g style={{
-          transformOrigin: `${cx}px ${cy}px`,
-          transform: `rotate(${dir}deg)`,
-          transition: 'transform 0.7s cubic-bezier(.34,1.56,.64,1)',
-        }}>
-          {/* Teal front half */}
-          <polygon points={`${cx},${cy - innerR + 2} ${cx - 3},${cy} ${cx + 3},${cy}`} fill="#0d9488" opacity="0.95" />
-          {/* Muted back half */}
-          <polygon points={`${cx},${cy + innerR - 2} ${cx - 3},${cy} ${cx + 3},${cy}`} fill="rgba(0,0,0,0.18)" />
-          {/* Center pin */}
-          <circle cx={cx} cy={cy} r="2.5" fill="#0d9488" />
-        </g>
-      </svg>
+          {/* Wind arrow — points FROM the direction wind is coming from */}
+          <g style={{
+            transformOrigin: `${cx}px ${cy}px`,
+            transform: `rotate(${dir}deg)`,
+            transition: 'transform 0.7s cubic-bezier(.34,1.56,.64,1)',
+          }}>
+            {/* Arrowhead pointing up */}
+            <polygon points={`${cx},${cy - innerR + 1} ${cx - 5},${cy - innerR + 10} ${cx + 5},${cy - innerR + 10}`} fill="#0d9488" />
+            {/* Arrow shaft */}
+            <line x1={cx} y1={cy - innerR + 10} x2={cx} y2={cy + 7}
+              stroke="#0d9488" strokeWidth="2.5" strokeLinecap="round" />
+            {/* Center pin */}
+            <circle cx={cx} cy={cy} r="3" fill="#0d9488" />
+          </g>
+        </svg>
+      </div>
 
       {/* Direction text */}
-      <span style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 700, color: 'var(--text)', marginTop: 4 }}>
+      <span style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 700, color: 'var(--text)', marginTop: 4, textAlign: 'center' }}>
         {direction != null ? `${Math.round(direction)}° ${windDirLabel(direction)}` : '—'}
       </span>
-      <span style={{ fontSize: 9, color: 'var(--text-faint)', marginTop: 1 }}>
+      <span style={{ fontSize: 9, color: 'var(--text-faint)', marginTop: 1, textAlign: 'center' }}>
         {speed != null ? `${fmtVal(speed)} m/s · ${beaufortLabel(speed)}` : '—'}
       </span>
     </div>
@@ -304,16 +310,37 @@ function HumidityCard({ value, low, high, delay = 0 }) {
   );
 }
 
-// ─── Pressure Card (with arc gauge) ────────────────────────────────────────────
+// ─── Pressure Card (barometer gauge) ───────────────────────────────────────────
 function PressureCard({ value, low, high, delay = 0 }) {
-  // Semicircle arc: 990–1040 hPa, left→top→right (clockwise through top)
-  const cx = 50, cy = 44, r = 34;
-  const gaugeMin = 990, gaugeMax = 1040;
-  const fraction = value != null ? Math.max(0, Math.min(1, (value - gaugeMin) / (gaugeMax - gaugeMin))) : 0;
-  // Marker angle: 180° (left) to 0° (right) going clockwise through top (270°)
-  const angle = Math.PI - fraction * Math.PI; // π→0 as fraction goes 0→1
-  const mx = cx + r * Math.cos(angle);
-  const my = cy - r * Math.sin(angle); // minus = SVG y inverted
+  // Semicircle arc 980–1040 hPa. viewBox 0 0 160 84 leaves room for labels outside arc.
+  const cx = 80, cy = 66, r = 50;
+  const gaugeMin = 980, gaugeMax = 1040;
+  const fraction = value != null ? Math.max(0, Math.min(1, (value - gaugeMin) / (gaugeMax - gaugeMin))) : 0.5;
+  // needleAngleDeg: -90°=left(980), 0°=up(1010), +90°=right(1040)
+  const needleAngleDeg = (fraction - 0.5) * 180;
+
+  // Point on the semicircle arc for a given hPa value
+  const arcAngle = (val) => Math.PI - ((val - gaugeMin) / (gaugeMax - gaugeMin)) * Math.PI;
+  const arcPt = (val) => {
+    const a = arcAngle(val);
+    return { x: cx + r * Math.cos(a), y: cy - r * Math.sin(a) };
+  };
+  const p980  = arcPt(980);
+  const p1000 = arcPt(1000);
+  const p1020 = arcPt(1020);
+  const p1040 = arcPt(1040);
+
+  // Label positions outside the arc (labelR > r)
+  const labelR = r + 13;
+  const lblPt = (val) => {
+    const a = arcAngle(val);
+    return { x: cx + labelR * Math.cos(a), y: cy - labelR * Math.sin(a) };
+  };
+  const l980  = lblPt(980);
+  const l1000 = lblPt(1000);
+  const l1020 = lblPt(1020);
+  const l1040 = lblPt(1040);
+
   const status = pressureStatus(value);
   const statusColor = status === 'Low' ? '#3B82F6' : status === 'High' ? '#F59E0B' : '#16A34A';
 
@@ -326,49 +353,70 @@ function PressureCard({ value, low, high, delay = 0 }) {
       onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 40px rgba(0,0,0,0.1)'; }}
       onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = ''; }}
     >
-      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Pressure</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
+        <Gauge size={11} color="var(--text-muted)" />
+        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Pressure</span>
+      </div>
 
-      {/* Arc gauge */}
-      <svg width={100} height={52} viewBox="0 0 100 52" style={{ display: 'block', margin: '4px auto 0' }}>
-        <defs>
-          <linearGradient id="pressure-grad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%"   stopColor="#3B82F6" />
-            <stop offset="50%"  stopColor="#16A34A" />
-            <stop offset="100%" stopColor="#F59E0B" />
-          </linearGradient>
-        </defs>
-        {/* Track arc */}
-        <path
-          d={`M ${cx - r},${cy} A ${r},${r} 0 0 1 ${cx + r},${cy}`}
-          fill="none" stroke="rgba(0,0,0,0.07)" strokeWidth="5" strokeLinecap="round"
-        />
-        {/* Colored fill arc (from left to marker) */}
-        {value != null && fraction > 0 && (
-          <path
-            d={`M ${cx - r},${cy} A ${r},${r} 0 0 1 ${mx.toFixed(2)},${my.toFixed(2)}`}
-            fill="none" stroke="url(#pressure-grad)" strokeWidth="5" strokeLinecap="round"
-          />
-        )}
-        {/* Marker dot */}
-        {value != null && (
-          <circle cx={mx} cy={my} r="4.5" fill={statusColor}
-            style={{ filter: `drop-shadow(0 0 4px ${statusColor}60)` }} />
-        )}
-        {/* Min/max labels */}
-        <text x={cx - r + 2} y={cy + 12} fontSize="7" fill="var(--text-faint)" fontFamily="var(--font)">990</text>
-        <text x={cx + r - 10} y={cy + 12} fontSize="7" fill="var(--text-faint)" fontFamily="var(--font)">1040</text>
+      {/* Barometer arc — width 100% scales to card, viewBox has room for all labels */}
+      <svg width="100%" viewBox="0 0 160 84" style={{ display: 'block', overflow: 'visible' }}>
+        {/* Background track */}
+        <path d={`M ${p980.x.toFixed(1)},${p980.y.toFixed(1)} A ${r},${r} 0 0 1 ${p1040.x.toFixed(1)},${p1040.y.toFixed(1)}`}
+          fill="none" stroke="rgba(0,0,0,0.07)" strokeWidth="6" strokeLinecap="round" />
+
+        {/* Blue zone: 980–1000 (Low) */}
+        <path d={`M ${p980.x.toFixed(1)},${p980.y.toFixed(1)} A ${r},${r} 0 0 1 ${p1000.x.toFixed(1)},${p1000.y.toFixed(1)}`}
+          fill="none" stroke="#3b82f6" strokeWidth="6" strokeLinecap="round" opacity="0.65" />
+        {/* Green zone: 1000–1020 (Normal) */}
+        <path d={`M ${p1000.x.toFixed(1)},${p1000.y.toFixed(1)} A ${r},${r} 0 0 1 ${p1020.x.toFixed(1)},${p1020.y.toFixed(1)}`}
+          fill="none" stroke="#10b981" strokeWidth="6" strokeLinecap="round" opacity="0.65" />
+        {/* Orange zone: 1020–1040 (High) */}
+        <path d={`M ${p1020.x.toFixed(1)},${p1020.y.toFixed(1)} A ${r},${r} 0 0 1 ${p1040.x.toFixed(1)},${p1040.y.toFixed(1)}`}
+          fill="none" stroke="#f59e0b" strokeWidth="6" strokeLinecap="round" opacity="0.65" />
+
+        {/* Zone divider ticks */}
+        {[1000, 1020].map(v => {
+          const a = arcAngle(v);
+          const ox = cx + r * Math.cos(a), oy = cy - r * Math.sin(a);
+          const ix = cx + (r - 8) * Math.cos(a), iy = cy - (r - 8) * Math.sin(a);
+          return <line key={v} x1={ox.toFixed(1)} y1={oy.toFixed(1)} x2={ix.toFixed(1)} y2={iy.toFixed(1)}
+            stroke="rgba(255,255,255,0.75)" strokeWidth="1.5" />;
+        })}
+
+        {/* Needle — rotates via CSS transform around pivot (cx, cy) */}
+        <g style={{
+          transformOrigin: `${cx}px ${cy}px`,
+          transform: `rotate(${needleAngleDeg}deg)`,
+          transition: 'transform 0.8s cubic-bezier(.34,1.56,.64,1)',
+        }}>
+          <line x1={cx} y1={cy} x2={cx} y2={cy - r + 8}
+            stroke="var(--text-mid)" strokeWidth="2" strokeLinecap="round" opacity="0.8" />
+          <polygon points={`${cx},${cy - r + 3} ${cx - 3.5},${cy - r + 12} ${cx + 3.5},${cy - r + 12}`}
+            fill="var(--text-mid)" opacity="0.8" />
+        </g>
+        {/* Pivot circles */}
+        <circle cx={cx} cy={cy} r="5" fill="var(--text-mid)" opacity="0.55" />
+        <circle cx={cx} cy={cy} r="2.5" fill="var(--glass-inner-bg)" />
+
+        {/* Scale labels outside arc — 980, 1000, 1020, 1040 */}
+        <text x={l980.x.toFixed(1)} y={(l980.y + 3.5).toFixed(1)} fontSize="7.5" fill="var(--text-faint)" fontFamily="var(--font)" textAnchor="end">980</text>
+        <text x={l1000.x.toFixed(1)} y={(l1000.y + 3.5).toFixed(1)} fontSize="7.5" fill="var(--text-faint)" fontFamily="var(--font)" textAnchor="middle">1000</text>
+        <text x={l1020.x.toFixed(1)} y={(l1020.y + 3.5).toFixed(1)} fontSize="7.5" fill="var(--text-faint)" fontFamily="var(--font)" textAnchor="middle">1020</text>
+        <text x={l1040.x.toFixed(1)} y={(l1040.y + 3.5).toFixed(1)} fontSize="7.5" fill="var(--text-faint)" fontFamily="var(--font)" textAnchor="start">1040</text>
       </svg>
 
-      {/* Value row */}
-      <div style={{ textAlign: 'center', marginTop: 2 }}>
+      {/* Value + status */}
+      <div style={{ textAlign: 'center', marginTop: 0 }}>
         <span style={{ fontFamily: 'var(--mono)', fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>{fmtVal(value, 1)}</span>
         <span style={{ fontSize: 9, color: 'var(--text-faint)', marginLeft: 3 }}>hPa</span>
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 3 }}>
+      <div style={{ textAlign: 'center', marginTop: 3 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: statusColor }}>{status}</span>
+      </div>
+      <div style={{ textAlign: 'center', marginTop: 2 }}>
         <span style={{ fontSize: 9, color: 'var(--text-faint)', fontFamily: 'var(--mono)' }}>
           {low != null && high != null ? `Low ${low} · High ${high}` : ''}
         </span>
-        <span style={{ fontSize: 9, fontWeight: 700, color: statusColor }}>{status}</span>
       </div>
     </div>
   );
@@ -544,7 +592,7 @@ export default function Dashboard({ profile }) {
   ];
 
   return (
-    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ width: '100%' }}>
       {isDemo && (
         <div style={{ ...glassInner({ padding: '8px 16px', borderRadius: 10, marginBottom: 16, background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.25)' }), display: 'flex', alignItems: 'center', gap: 8, animation: 'glassIn 0.4s ease both' }}>
           <AlertTriangle size={14} color="#CA8A04" />

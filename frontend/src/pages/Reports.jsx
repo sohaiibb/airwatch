@@ -882,7 +882,7 @@ export default function Reports({ profile }) {
     : COLS.filter(c => selectedParams.has(c.key));
 
   return (
-    <div style={{ maxWidth: 1080, margin: '0 auto' }}>
+    <div style={{ width: '100%' }}>
 
       {/* Page title */}
       <div style={{ marginBottom: 22, animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) both' }}>

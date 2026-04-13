@@ -622,7 +622,7 @@ export default function DataTable({ profile }) {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ width: '100%' }}>
 
       {/* ── Page title ── */}
       <div style={{ marginBottom: 20, animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) both' }}>

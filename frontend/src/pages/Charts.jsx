@@ -1320,7 +1320,7 @@ export default function Charts({ profile }) {
   });
 
   return (
-    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ width: '100%' }}>
 
       {/* Header: Station selector + Time range */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12, flexDirection: isMobile ? 'column' : 'row' }}>

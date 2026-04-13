@@ -263,7 +263,7 @@ function AppInner({ profile, session, onLogout }) {
         </div>
       )}
 
-      <main style={{ flex: 1, marginLeft: isMobile ? 0 : (sidebarOpen ? 240 : 64), transition: 'margin-left 0.3s cubic-bezier(.16,1,.3,1)', position: 'relative', zIndex: 1, padding: isMobile ? `${tickerVisible ? 96 : 60}px 12px 24px` : `${tickerVisible ? 60 : 24}px 24px 24px`, maxWidth: 1400, overflowX: 'hidden', width: isMobile ? '100%' : undefined, minWidth: 0 }}>
+      <main style={{ flex: 1, marginLeft: isMobile ? 0 : (sidebarOpen ? 240 : 64), transition: 'margin-left 0.3s cubic-bezier(.16,1,.3,1)', position: 'relative', zIndex: 1, padding: isMobile ? `${tickerVisible ? 96 : 60}px 12px 24px` : `${tickerVisible ? 60 : 24}px 24px 24px`, width: '100%', overflowX: 'hidden', minWidth: 0, boxSizing: 'border-box' }}>
         {renderPage()}
       </main>
     </div>
