@@ -33,7 +33,7 @@ const THRESHOLDS = {
   so2:            { yellow: 263,   red: 441 },
   no2:            { yellow: 150,   red: 200 },
   o3:             { yellow: 118,   red: 157 },
-  co:             { yellow: 30000, red: 40000 }, // 40 mg/m³ = 40,000 µg/m³
+  co:             { yellow: 30000, red: 40000 }, // µg/m³
   temperature:    null,
   humidity:       null,
   wind_speed:     null,

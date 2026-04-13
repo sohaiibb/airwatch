@@ -73,7 +73,7 @@ export function generateDemoStations() {
   const r = (v, rng) => +(v + (Math.random()-.5)*rng).toFixed(1);
   return defs.map(s => ({ ...s, reading: {
     aqi: Math.round(s.base + (Math.random()-.5)*20), pm25: r(s.base*.35,8), pm10: r(s.base*.65,14),
-    so2: r(6,5), no2: r(14,10), o3: r(35,20), co: r(0.5,0.3),
+    so2: r(6,5), no2: r(14,10), o3: r(35,20), co: r(800,400),
     temperature: r(38,4), humidity: r(42,10), wind_speed: r(4.5,3),
     wind_direction: r(180,180), pressure: r(1013,5), visibility: r(9,3),
     timestamp: new Date().toISOString(),
@@ -88,7 +88,7 @@ export function generateDemoHistory(hours = 24) {
       aqi: Math.round(b+Math.random()*18), pm25: +(7+Math.random()*16).toFixed(1),
       pm10: +(14+Math.random()*28).toFixed(1), so2: +(2+Math.random()*8).toFixed(1),
       no2: +(5+Math.random()*20).toFixed(1), o3: +(18+Math.random()*35).toFixed(1),
-      co: +(0.2+Math.random()*0.6).toFixed(2), temperature: +(34+Math.random()*8).toFixed(1),
+      co: +(400+Math.random()*800).toFixed(0), temperature: +(34+Math.random()*8).toFixed(1),
       humidity: +(35+Math.random()*15).toFixed(1), wind_speed: +(1+Math.random()*7).toFixed(1),
       wind_direction: Math.round(Math.random()*360),
     });
