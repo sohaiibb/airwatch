@@ -9,7 +9,7 @@ import {
   Activity, AlertTriangle, TrendingUp, TrendingDown, Download,
   ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Search, GitBranch,
 } from 'lucide-react';
-import { getStations, getDemoStations, getDemoHistory, getDemoDaily, getDemoReadings } from '../lib/supabase';
+import { getStations, getDemoStations, getDemoHistory, getDemoDaily, getDemoReadings, getReadingsHistory } from '../lib/supabase';
 import { glass, glassInner, getAqiLevel, POLLUTANTS, NCEC_STANDARDS, formatTime, formatDate } from '../lib/utils';
 
 const PAGE_SIZE = 20;
@@ -1221,9 +1221,15 @@ export default function Charts({ profile }) {
     if (!stations.length) return;
     const sid = stations[selIdx]?.id;
     if (!sid) return;
-    const hist = getDemoHistory(sid, 720);
-    setAllData(hist);
-    setPage(0);
+    if (sid.startsWith('demo-')) {
+      setAllData(getDemoHistory(sid, 720));
+      setPage(0);
+    } else {
+      getReadingsHistory(sid, 720).then(hist => {
+        setAllData(hist || []);
+        setPage(0);
+      });
+    }
   }, [selIdx, stations]);
 
   useEffect(() => { setPage(0); }, [aggMode, filter, sortKey, sortDir]);
