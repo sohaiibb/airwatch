@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import {
-  AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer, ReferenceLine, ReferenceArea,
+  AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, ReferenceLine,
   ComposedChart, Scatter, Line as RLine,
 } from 'recharts';
 import {
@@ -64,60 +64,13 @@ function aggregate(rows, mode) {
   });
 }
 
-// ─── Full timestamp formatter ───
+// ─── Full timestamp formatter (table) ───
 function fmtTs(ts) {
   if (!ts) return '—';
   return new Date(ts).toLocaleString('en-GB', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit', hour12: false,
   });
-}
-
-// ─── Pub-chart date formatter ───
-function fmtPubDate(ts) {
-  if (!ts) return '—';
-  return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-}
-function fmtAxisTs(ts) {
-  if (!ts) return '';
-  const d = new Date(ts);
-  return `${d.getDate()} ${d.toLocaleString('en', { month: 'short' })} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-}
-
-// ─── Filename builder ───
-function buildExportFilename(tag, stationName, fromTs, toTs, ext) {
-  const sn = (stationName || 'Station').replace(/\s+/g, '');
-  const from = fromTs ? new Date(fromTs).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '') : 'From';
-  const to   = toTs   ? new Date(toTs).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '') : 'To';
-  const suffix = ext === 'png' ? '_300dpi' : '';
-  return `AirWatch_${tag}_${sn}_${from}_${to}${suffix}.${ext}`;
-}
-
-// ─── Run html2canvas + download ───
-async function captureAndDownload(el, filename, format) {
-  if (format === 'svg') {
-    const svgEl = el.querySelector('svg');
-    if (!svgEl) return;
-    const clone = svgEl.cloneNode(true);
-    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-    const str = new XMLSerializer().serializeToString(clone);
-    const blob = new Blob([str], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.download = filename; a.href = url; a.click();
-    URL.revokeObjectURL(url);
-    return;
-  }
-  const h2c = (await import('html2canvas')).default;
-  const canvas = await h2c(el, { scale: 3, backgroundColor: '#ffffff', useCORS: true, logging: false });
-  if (format === 'png') {
-    const a = document.createElement('a'); a.download = filename; a.href = canvas.toDataURL('image/png'); a.click();
-  } else {
-    const { jsPDF } = await import('jspdf');
-    const pw = canvas.width / 3, ph = canvas.height / 3;
-    const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [pw, ph] });
-    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pw, ph);
-    pdf.save(filename);
-  }
 }
 
 // ─── Glass Tooltip ───
@@ -135,190 +88,713 @@ const GlassTooltip = ({ active, payload, label }) => {
   );
 };
 
-// ─── Publication chart content — single pollutant ───
-function PubChartContent({ pollutant, data, stationName, showNcec, ncecLimit, ncecLabel }) {
-  const { key, name, unit, color } = pollutant;
-  const fromTs = data[0]?.timestamp;
-  const toTs   = data[data.length - 1]?.timestamp;
-  const dateRange = `Period: ${fmtPubDate(fromTs)} — ${fmtPubDate(toTs)}`;
-  const showDots = data.length < 100;
-  const values = data.map(d => d[key]).filter(v => v != null);
-  const rawMax = values.length ? Math.max(...values) : 0;
-  const yMax = Math.max(rawMax, ncecLimit || 0) * 1.22;
-  const chartData = data.map(d => ({ ...d, axisTime: fmtAxisTs(d.timestamp) }));
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Canvas / SVG Export Engine ──────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
 
-  return (
-    <div style={{ background: '#fff', fontFamily: 'Arial, sans-serif' }}>
-      <div style={{ textAlign: 'center', borderBottom: '1.5px solid #ccc', paddingBottom: 10, marginBottom: 10 }}>
-        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 18, fontWeight: 'bold', margin: '0 0 3px', color: '#111' }}>
-          {name} Concentration — {stationName}
-        </h2>
-        <p style={{ fontSize: 11, color: '#555', margin: 0, fontStyle: 'italic' }}>{dateRange}</p>
-      </div>
-      <div style={{ height: 400 }}>
-        <ResponsiveContainer width="100%" height={400}>
-          <LineChart data={chartData} margin={{ top: 10, right: 100, bottom: 55, left: 80 }}>
-            <CartesianGrid strokeDasharray="4 4" stroke="#d8d8d8" />
-            <XAxis dataKey="axisTime"
-              tick={{ fill: '#444', fontSize: 9, fontFamily: 'Arial' }}
-              axisLine={{ stroke: '#444', strokeWidth: 1.5 }} tickLine={{ stroke: '#444' }}
-              label={{ value: 'Date / Time (GMT+3)', position: 'insideBottom', offset: -38, fill: '#222', fontSize: 11, fontWeight: 'bold', fontFamily: 'Arial' }}
-              interval="preserveStartEnd" />
-            <YAxis
-              tick={{ fill: '#444', fontSize: 9, fontFamily: 'Arial' }}
-              axisLine={{ stroke: '#444', strokeWidth: 1.5 }} tickLine={{ stroke: '#444' }}
-              label={{ value: `Concentration (${unit})`, angle: -90, position: 'insideLeft', offset: -62, fill: '#222', fontSize: 11, fontWeight: 'bold', fontFamily: 'Arial' }}
-              domain={[0, yMax > 0 ? Math.ceil(yMax) : 'auto']} />
-            {showNcec && ncecLimit != null && yMax > 0 && (
-              <ReferenceArea y1={ncecLimit} y2={Math.ceil(yMax)} fill="rgba(220,38,38,0.07)" />
-            )}
-            {showNcec && ncecLimit != null && (
-              <ReferenceLine y={ncecLimit} stroke="#DC2626" strokeDasharray="6 3" strokeWidth={1.5}
-                label={{ value: ncecLabel, position: 'right', fill: '#DC2626', fontSize: 9, fontFamily: 'Arial' }} />
-            )}
-            <Line type="monotone" dataKey={key} stroke={color} strokeWidth={1.5}
-              dot={showDots ? { r: 2, fill: color, stroke: 'none' } : false}
-              name={`${name} Measured`} isAnimationActive={false} />
-            <Legend wrapperStyle={{ fontFamily: 'Arial', fontSize: 10, paddingTop: 6 }} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 10, color: '#888', borderTop: '1px solid #ddd', paddingTop: 6 }}>
-        <span>Hills and Field AirWatch Monitoring Dashboard</span>
-        <span>Station: {stationName} | Generated: {new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-      </div>
-    </div>
-  );
+// Nice round axis ticks
+function computeAxisTicks(min, max, count = 8) {
+  const range = max - min;
+  if (range <= 0) return [min || 0, 1];
+  const rawStep = range / count;
+  const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const norm = rawStep / mag;
+  const step = norm < 1.5 ? mag : norm < 3.5 ? 2 * mag : norm < 7.5 ? 5 * mag : 10 * mag;
+  const start = Math.ceil(min / step) * step;
+  const ticks = [];
+  for (let t = start; t <= max + step * 0.01; t = parseFloat((t + step).toFixed(10))) {
+    ticks.push(t);
+    if (ticks.length > 20) break;
+  }
+  if (!ticks.length) ticks.push(0);
+  return ticks;
 }
 
-// ─── Publication chart — multi-overlay ───
-function PubOverlayContent({ activePollutants, data, stationName }) {
-  const fromTs = data[0]?.timestamp, toTs = data[data.length - 1]?.timestamp;
-  const chartData = data.map(d => ({ ...d, axisTime: fmtAxisTs(d.timestamp) }));
-  return (
-    <div style={{ background: '#fff', fontFamily: 'Arial, sans-serif' }}>
-      <div style={{ textAlign: 'center', borderBottom: '1.5px solid #ccc', paddingBottom: 10, marginBottom: 10 }}>
-        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 18, fontWeight: 'bold', margin: '0 0 3px', color: '#111' }}>
-          Multi-Pollutant Overlay — {stationName}
-        </h2>
-        <p style={{ fontSize: 11, color: '#555', margin: 0, fontStyle: 'italic' }}>Period: {fmtPubDate(fromTs)} — {fmtPubDate(toTs)}</p>
-      </div>
-      <div style={{ height: 420 }}>
-        <ResponsiveContainer width="100%" height={420}>
-          <LineChart data={chartData} margin={{ top: 10, right: 30, bottom: 55, left: 80 }}>
-            <CartesianGrid strokeDasharray="4 4" stroke="#d8d8d8" />
-            <XAxis dataKey="axisTime"
-              tick={{ fill: '#444', fontSize: 9, fontFamily: 'Arial' }}
-              axisLine={{ stroke: '#444', strokeWidth: 1.5 }} tickLine={{ stroke: '#444' }}
-              label={{ value: 'Date / Time (GMT+3)', position: 'insideBottom', offset: -38, fill: '#222', fontSize: 11, fontWeight: 'bold', fontFamily: 'Arial' }}
-              interval="preserveStartEnd" />
-            <YAxis
-              tick={{ fill: '#444', fontSize: 9, fontFamily: 'Arial' }}
-              axisLine={{ stroke: '#444', strokeWidth: 1.5 }} tickLine={{ stroke: '#444' }}
-              label={{ value: 'Concentration (µg/m³)', angle: -90, position: 'insideLeft', offset: -62, fill: '#222', fontSize: 11, fontWeight: 'bold', fontFamily: 'Arial' }} />
-            {activePollutants.map(p => (
-              <Line key={p.key} type="monotone" dataKey={p.key} stroke={p.color} strokeWidth={1.5}
-                dot={false} name={p.name} isAnimationActive={false} />
-            ))}
-            <Legend wrapperStyle={{ fontFamily: 'Arial', fontSize: 10, paddingTop: 6 }} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 10, color: '#888', borderTop: '1px solid #ddd', paddingTop: 6 }}>
-        <span>Hills and Field AirWatch Monitoring Dashboard</span>
-        <span>Station: {stationName} | Generated: {new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-      </div>
-    </div>
-  );
+// X-axis tick label based on time range
+function fmtXTick(ts, rangeHours) {
+  const d = new Date(ts);
+  const mo = d.toLocaleString('en', { month: 'short' });
+  if (rangeHours <= 48)
+    return `${d.getDate()} ${mo} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  return `${d.getDate()} ${mo}`;
 }
 
-// ─── Publication chart — correlation scatter ───
-function PubCorrContent({ xParam, yParam, points, trendData, rValue, stationName }) {
-  const CustomPubDot = (props) => {
-    const { cx, cy, payload } = props;
-    const c = payload.aqi == null ? '#94a3b8'
-      : payload.aqi <= 50 ? '#16A34A'
-      : payload.aqi <= 100 ? '#CA8A04'
-      : payload.aqi <= 150 ? '#EA580C'
-      : payload.aqi <= 200 ? '#DC2626' : '#7C3AED';
-    return <circle cx={cx} cy={cy} r={3} fill={c} fillOpacity={0.75} stroke="none" />;
+// Short date for subtitle / footer
+function fmtPubDate(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+// Date+time subtitle range
+function fmtSubtitleRange(fromTs, toTs) {
+  const f = ts => {
+    if (!ts) return '—';
+    const d = new Date(ts);
+    const mo = d.toLocaleString('en', { month: 'short' });
+    return `${d.getDate()} ${mo} ${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
   };
-  return (
-    <div style={{ background: '#fff', fontFamily: 'Arial, sans-serif' }}>
-      <div style={{ textAlign: 'center', borderBottom: '1.5px solid #ccc', paddingBottom: 10, marginBottom: 10 }}>
-        <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 18, fontWeight: 'bold', margin: '0 0 3px', color: '#111' }}>
-          Pollutant Correlation: {xParam.name} vs {yParam.name} — {stationName}
-        </h2>
-        <p style={{ fontSize: 11, color: '#555', margin: 0, fontStyle: 'italic' }}>
-          Pearson R = {rValue.toFixed(3)} · {rInterpret(rValue)}
-        </p>
-      </div>
-      <div style={{ height: 420 }}>
-        <ResponsiveContainer width="100%" height={420}>
-          <ComposedChart margin={{ top: 10, right: 30, bottom: 60, left: 80 }}>
-            <CartesianGrid strokeDasharray="4 4" stroke="#d8d8d8" />
-            <XAxis dataKey="x" type="number" domain={['auto','auto']} name={xParam.name}
-              tick={{ fill: '#444', fontSize: 9, fontFamily: 'Arial' }}
-              axisLine={{ stroke: '#444', strokeWidth: 1.5 }} tickLine={{ stroke: '#444' }}
-              label={{ value: `${xParam.name} (${xParam.unit})`, position: 'insideBottom', offset: -38, fill: '#222', fontSize: 11, fontWeight: 'bold', fontFamily: 'Arial' }} />
-            <YAxis dataKey="y" type="number" domain={['auto','auto']} name={yParam.name}
-              tick={{ fill: '#444', fontSize: 9, fontFamily: 'Arial' }}
-              axisLine={{ stroke: '#444', strokeWidth: 1.5 }} tickLine={{ stroke: '#444' }}
-              label={{ value: `${yParam.name} (${yParam.unit})`, angle: -90, position: 'insideLeft', offset: -62, fill: '#222', fontSize: 11, fontWeight: 'bold', fontFamily: 'Arial' }} />
-            <Scatter data={points} shape={<CustomPubDot />} />
-            {trendData.length === 2 && (
-              <RLine data={trendData} dataKey="y" dot={false} stroke="#0d9488" strokeWidth={1.5} strokeDasharray="6 3" type="linear" isAnimationActive={false} name="Trend" />
-            )}
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
-      <div style={{ display: 'flex', gap: 14, marginTop: 4, flexWrap: 'wrap', fontSize: 10, color: '#555', borderTop: '1px solid #ddd', paddingTop: 6 }}>
-        <span style={{ fontWeight: 600, color: '#888' }}>Dot color = AQI:</span>
-        {[['#16A34A','Good (0-50)'],['#CA8A04','Moderate'],['#EA580C','USG'],['#DC2626','Unhealthy'],['#7C3AED','Very Unhealthy'],['#94a3b8','Unknown']].map(([c,l]) => (
-          <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: c, display: 'inline-block' }} />{l}
-          </span>
-        ))}
-        <span style={{ marginLeft: 'auto', color: '#888' }}>Hills and Field AirWatch | Generated: {new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-      </div>
-    </div>
-  );
+  return `${f(fromTs)} — ${f(toTs)}`;
 }
 
-// ─── Download dropdown + export hook ───
+// Filename builder  — AirWatch_PM25_12Apr2026_13Apr2026.ext
+function buildFilename(tag, fromTs, toTs, ext) {
+  const fmt = ts => {
+    if (!ts) return 'na';
+    const d = new Date(ts);
+    return `${String(d.getDate()).padStart(2,'0')}${d.toLocaleString('en',{month:'short'})}${d.getFullYear()}`;
+  };
+  return `AirWatch_${tag}_${fmt(fromTs)}_${fmt(toTs)}.${ext}`;
+}
+
+// XML escaping for SVG text
+function escXML(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Tick label formatter (for y axis)
+function fmtTick(v) {
+  if (v >= 10000) return (v / 1000).toFixed(v % 1000 === 0 ? 0 : 1) + 'k';
+  if (v % 1 === 0) return String(v);
+  return v.toFixed(1);
+}
+
+// ─── Constants shared across draw functions ───
+const EXP_W = 2400, EXP_H = 1400;
+const PL = 155, PR = 2330, PT = 148, PB = 1215;
+const PW = PR - PL, PH = PB - PT;
+
+// ─── Common canvas setup: background + title + grid + axes helper ───
+function _canvasBase(ctx, { title, subtitle }) {
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, EXP_W, EXP_H);
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#1a1a1a';
+  ctx.font = 'bold 36px Arial';
+  ctx.fillText(title, EXP_W / 2, 58);
+
+  ctx.fillStyle = '#666666';
+  ctx.font = '22px Arial';
+  ctx.fillText(subtitle, EXP_W / 2, 100);
+}
+
+function _drawHGrid(ctx, yTicks, toY) {
+  yTicks.forEach(t => {
+    const y = toY(t);
+    ctx.save();
+    ctx.strokeStyle = '#e0e0e0'; ctx.lineWidth = 1; ctx.setLineDash([5,5]);
+    ctx.beginPath(); ctx.moveTo(PL, y); ctx.lineTo(PR, y); ctx.stroke();
+    ctx.restore();
+  });
+}
+
+function _drawVGrid(ctx, xIdxs, toX) {
+  xIdxs.forEach(i => {
+    const x = toX(i);
+    ctx.save();
+    ctx.strokeStyle = '#e0e0e0'; ctx.lineWidth = 1; ctx.setLineDash([5,5]);
+    ctx.beginPath(); ctx.moveTo(x, PT); ctx.lineTo(x, PB); ctx.stroke();
+    ctx.restore();
+  });
+}
+
+function _drawPlotBorder(ctx) {
+  ctx.strokeStyle = '#cccccc'; ctx.lineWidth = 1.5; ctx.setLineDash([]);
+  ctx.strokeRect(PL, PT, PW, PH);
+}
+
+function _drawYAxis(ctx, yTicks, toY, yLabel) {
+  // Tick numbers
+  ctx.fillStyle = '#333333'; ctx.font = '16px Arial'; ctx.textAlign = 'right';
+  yTicks.forEach(t => ctx.fillText(fmtTick(t), PL - 10, toY(t) + 5));
+  // Rotated label
+  ctx.save();
+  ctx.translate(32, PT + PH / 2); ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center'; ctx.fillStyle = '#1a1a1a'; ctx.font = 'bold 20px Arial';
+  ctx.fillText(yLabel, 0, 0);
+  ctx.restore();
+}
+
+function _drawXAxis(ctx, data, xIdxs, toX, rangeHours) {
+  ctx.fillStyle = '#333333'; ctx.font = '15px Arial';
+  xIdxs.forEach(i => {
+    if (!data[i]) return;
+    const x = toX(i);
+    const label = fmtXTick(data[i].timestamp, rangeHours);
+    ctx.save();
+    ctx.translate(x, PB + 18); ctx.rotate(-Math.PI / 4);
+    ctx.textAlign = 'right'; ctx.fillText(label, 0, 0);
+    ctx.restore();
+  });
+  ctx.fillStyle = '#1a1a1a'; ctx.font = 'bold 20px Arial'; ctx.textAlign = 'center';
+  ctx.fillText('Date & Time', PL + PW / 2, PB + 105);
+}
+
+function _drawFooter(ctx, fromTs, toTs) {
+  const fY = EXP_H - 22;
+  ctx.fillStyle = '#999999'; ctx.font = '14px Arial';
+  ctx.textAlign = 'left';
+  ctx.fillText('Hills and Field AirWatch Monitoring Dashboard', PL, fY);
+  ctx.textAlign = 'right';
+  ctx.fillText(`Period: ${fmtPubDate(fromTs)} — ${fmtPubDate(toTs)}`, PR, fY);
+}
+
+function _getXIdxs(n) {
+  const maxTicks = 14;
+  const step = Math.max(1, Math.round(n / maxTicks));
+  const idxs = [];
+  for (let i = 0; i < n; i += step) idxs.push(i);
+  if (idxs.length && idxs[idxs.length - 1] !== n - 1) idxs.push(n - 1);
+  return idxs;
+}
+
+// ─── Draw single-pollutant chart onto ctx ───
+function drawExportChart(ctx, opts) {
+  const { title, subtitle, dataKey, color, unit, data, showNcec, ncecLimit, ncecLabel } = opts;
+  _canvasBase(ctx, { title, subtitle });
+
+  const vals = data.map(d => d[dataKey]).filter(v => v != null && !isNaN(v)).map(Number);
+  const dataMax = vals.length ? Math.max(...vals) : 10;
+  const yDomain = Math.max(dataMax, showNcec && ncecLimit ? ncecLimit : 0) * 1.2 || 10;
+  const yTicks = computeAxisTicks(0, yDomain, 8);
+  const yMax = yTicks[yTicks.length - 1];
+
+  const toY = v => PT + PH - (v / yMax) * PH;
+  const toX = i => PL + (data.length > 1 ? (i / (data.length - 1)) * PW : PW / 2);
+  const rangeMs = data.length > 1 ? new Date(data[data.length-1].timestamp) - new Date(data[0].timestamp) : 86400000;
+  const rangeHours = rangeMs / 3600000;
+  const xIdxs = _getXIdxs(data.length);
+
+  _drawHGrid(ctx, yTicks, toY);
+  _drawVGrid(ctx, xIdxs, toX);
+
+  // NCEC shaded area (above line = exceedance zone)
+  if (showNcec && ncecLimit != null && ncecLimit <= yMax) {
+    const ny = toY(ncecLimit);
+    ctx.fillStyle = 'rgba(239,68,68,0.07)';
+    ctx.fillRect(PL, PT, PW, Math.max(0, ny - PT));
+  }
+
+  // Data line (clipped)
+  if (vals.length >= 2) {
+    ctx.save();
+    ctx.beginPath(); ctx.rect(PL, PT, PW, PH); ctx.clip();
+    ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.setLineDash([]);
+    ctx.beginPath();
+    let first = true;
+    data.forEach((d, i) => {
+      const v = d[dataKey];
+      if (v == null || isNaN(v)) { first = true; return; }
+      const x = toX(i), y = toY(Number(v));
+      first ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      first = false;
+    });
+    ctx.stroke();
+    if (vals.length < 50) {
+      ctx.fillStyle = color;
+      data.forEach((d, i) => {
+        const v = d[dataKey]; if (v == null || isNaN(v)) return;
+        ctx.beginPath(); ctx.arc(toX(i), toY(Number(v)), 5, 0, Math.PI * 2); ctx.fill();
+      });
+    }
+    ctx.restore();
+  }
+
+  // NCEC dashed line + label
+  if (showNcec && ncecLimit != null && ncecLimit <= yMax) {
+    const ny = toY(ncecLimit);
+    ctx.save();
+    ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 2; ctx.setLineDash([10, 6]);
+    ctx.beginPath(); ctx.moveTo(PL, ny); ctx.lineTo(PR, ny); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = '#ef4444'; ctx.font = '15px Arial'; ctx.textAlign = 'left';
+    ctx.fillText(ncecLabel || '', PR + 8, ny + 5);
+  }
+
+  _drawPlotBorder(ctx);
+  _drawYAxis(ctx, yTicks, toY, `Concentration (${unit})`);
+  _drawXAxis(ctx, data, xIdxs, toX, rangeHours);
+
+  // Legend
+  const legendY = PB + 150;
+  const legendItems = [
+    { label: `${title.replace(' Concentration', '')} Measured`, color, dashed: false },
+    ...(showNcec && ncecLimit != null ? [{ label: 'NCEC Standard', color: '#ef4444', dashed: true }] : []),
+  ];
+  const iW = 240;
+  let lx = EXP_W / 2 - (legendItems.length * iW) / 2;
+  legendItems.forEach(item => {
+    ctx.save();
+    ctx.strokeStyle = item.color; ctx.lineWidth = 2.5;
+    ctx.setLineDash(item.dashed ? [8,5] : []);
+    ctx.beginPath(); ctx.moveTo(lx, legendY); ctx.lineTo(lx + 32, legendY); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = '#333333'; ctx.font = '16px Arial'; ctx.textAlign = 'left';
+    ctx.fillText(item.label, lx + 40, legendY + 5);
+    lx += iW;
+  });
+
+  _drawFooter(ctx, data[0]?.timestamp, data[data.length-1]?.timestamp);
+}
+
+// ─── Draw multi-pollutant overlay chart onto ctx ───
+function drawOverlayChart(ctx, opts) {
+  const { title, subtitle, activePollutants, data } = opts;
+  _canvasBase(ctx, { title, subtitle });
+
+  let allMax = 0;
+  activePollutants.forEach(p => data.forEach(d => {
+    const v = d[p.key]; if (v != null && !isNaN(v)) allMax = Math.max(allMax, Number(v));
+  }));
+  const yTicks = computeAxisTicks(0, allMax * 1.2 || 10, 8);
+  const yMax = yTicks[yTicks.length - 1];
+  const toY = v => PT + PH - (v / yMax) * PH;
+  const toX = i => PL + (data.length > 1 ? (i / (data.length - 1)) * PW : PW / 2);
+  const rangeMs = data.length > 1 ? new Date(data[data.length-1].timestamp) - new Date(data[0].timestamp) : 86400000;
+  const rangeHours = rangeMs / 3600000;
+  const xIdxs = _getXIdxs(data.length);
+
+  _drawHGrid(ctx, yTicks, toY);
+  _drawVGrid(ctx, xIdxs, toX);
+
+  // Data lines (clipped)
+  ctx.save();
+  ctx.beginPath(); ctx.rect(PL, PT, PW, PH); ctx.clip();
+  activePollutants.forEach(p => {
+    ctx.strokeStyle = p.color; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.setLineDash([]);
+    ctx.beginPath();
+    let first = true;
+    data.forEach((d, i) => {
+      const v = d[p.key]; if (v == null || isNaN(v)) { first = true; return; }
+      const x = toX(i), y = toY(Number(v));
+      first ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      first = false;
+    });
+    ctx.stroke();
+  });
+  ctx.restore();
+
+  _drawPlotBorder(ctx);
+  _drawYAxis(ctx, yTicks, toY, 'Concentration (µg/m³)');
+  _drawXAxis(ctx, data, xIdxs, toX, rangeHours);
+
+  // Legend
+  const legendY = PB + 150;
+  const iW = 190;
+  let lx = EXP_W / 2 - (activePollutants.length * iW) / 2;
+  activePollutants.forEach(p => {
+    ctx.save();
+    ctx.strokeStyle = p.color; ctx.lineWidth = 2.5; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(lx, legendY); ctx.lineTo(lx + 32, legendY); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = '#333333'; ctx.font = '16px Arial'; ctx.textAlign = 'left';
+    ctx.fillText(p.name, lx + 40, legendY + 5);
+    lx += iW;
+  });
+
+  _drawFooter(ctx, data[0]?.timestamp, data[data.length-1]?.timestamp);
+}
+
+// ─── Draw correlation scatter chart onto ctx ───
+function drawCorrChart(ctx, opts) {
+  const { title, subtitle, xParam, yParam, points, trendData, rValue } = opts;
+  _canvasBase(ctx, { title, subtitle });
+
+  if (!points.length) { return; }
+
+  const xs = points.map(p => p.x), ys = points.map(p => p.y);
+  const xMin = Math.min(...xs), xMax = Math.max(...xs);
+  const yMin = Math.min(...ys), yMax = Math.max(...ys);
+  const xPad = (xMax - xMin) * 0.08 || 1, yPad = (yMax - yMin) * 0.08 || 1;
+  const xDom = [xMin - xPad, xMax + xPad];
+  const yDom = [yMin - yPad, yMax + yPad];
+
+  const toX = v => PL + ((v - xDom[0]) / (xDom[1] - xDom[0])) * PW;
+  const toY = v => PT + PH - ((v - yDom[0]) / (yDom[1] - yDom[0])) * PH;
+
+  const xTicks = computeAxisTicks(xDom[0], xDom[1], 8);
+  const yTicks = computeAxisTicks(yDom[0], yDom[1], 8);
+
+  // Grid
+  yTicks.filter(t => t >= yDom[0] && t <= yDom[1]).forEach(t => {
+    const y = toY(t);
+    ctx.save(); ctx.strokeStyle = '#e0e0e0'; ctx.lineWidth = 1; ctx.setLineDash([5,5]);
+    ctx.beginPath(); ctx.moveTo(PL, y); ctx.lineTo(PR, y); ctx.stroke(); ctx.restore();
+  });
+  xTicks.filter(t => t >= xDom[0] && t <= xDom[1]).forEach(t => {
+    const x = toX(t);
+    ctx.save(); ctx.strokeStyle = '#e0e0e0'; ctx.lineWidth = 1; ctx.setLineDash([5,5]);
+    ctx.beginPath(); ctx.moveTo(x, PT); ctx.lineTo(x, PB); ctx.stroke(); ctx.restore();
+  });
+
+  // Scatter points (clipped)
+  ctx.save();
+  ctx.beginPath(); ctx.rect(PL, PT, PW, PH); ctx.clip();
+  points.forEach(p => {
+    const c = p.aqi == null ? '#94a3b8' : p.aqi <= 50 ? '#16A34A' : p.aqi <= 100 ? '#CA8A04' : p.aqi <= 150 ? '#EA580C' : p.aqi <= 200 ? '#DC2626' : '#7C3AED';
+    ctx.fillStyle = c + 'cc';
+    ctx.beginPath(); ctx.arc(toX(p.x), toY(p.y), 5, 0, Math.PI * 2); ctx.fill();
+  });
+  // Trend line
+  if (trendData.length === 2) {
+    ctx.strokeStyle = '#0d9488'; ctx.lineWidth = 2; ctx.setLineDash([8,5]);
+    ctx.beginPath();
+    ctx.moveTo(toX(trendData[0].x), toY(trendData[0].y));
+    ctx.lineTo(toX(trendData[1].x), toY(trendData[1].y));
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  _drawPlotBorder(ctx);
+
+  // Y tick labels
+  ctx.fillStyle = '#333333'; ctx.font = '16px Arial'; ctx.textAlign = 'right';
+  yTicks.filter(t => t >= yDom[0] && t <= yDom[1]).forEach(t => ctx.fillText(fmtTick(t), PL - 10, toY(t) + 5));
+
+  // Y-axis label
+  ctx.save();
+  ctx.translate(32, PT + PH / 2); ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center'; ctx.fillStyle = '#1a1a1a'; ctx.font = 'bold 20px Arial';
+  ctx.fillText(`${yParam.name} (${yParam.unit})`, 0, 0);
+  ctx.restore();
+
+  // X tick labels
+  ctx.fillStyle = '#333333'; ctx.font = '15px Arial';
+  xTicks.filter(t => t >= xDom[0] && t <= xDom[1]).forEach(t => {
+    const x = toX(t);
+    ctx.save();
+    ctx.translate(x, PB + 18); ctx.rotate(-Math.PI / 4); ctx.textAlign = 'right';
+    ctx.fillText(fmtTick(t), 0, 0);
+    ctx.restore();
+  });
+
+  // X-axis label
+  ctx.fillStyle = '#1a1a1a'; ctx.font = 'bold 20px Arial'; ctx.textAlign = 'center';
+  ctx.fillText(`${xParam.name} (${xParam.unit})`, PL + PW / 2, PB + 105);
+
+  // AQI legend
+  const legendY = PB + 148;
+  const aqiItems = [
+    ['#16A34A','Good (0–50)'], ['#CA8A04','Moderate (51–100)'], ['#EA580C','Sensitive (101–150)'],
+    ['#DC2626','Unhealthy (151–200)'], ['#7C3AED','Very Unhealthy (>200)'], ['#94a3b8','Unknown'],
+  ];
+  const iW = 280;
+  let lx = EXP_W / 2 - (aqiItems.length * iW) / 2;
+  ctx.font = '15px Arial';
+  aqiItems.forEach(([c, l]) => {
+    ctx.fillStyle = c + 'cc';
+    ctx.beginPath(); ctx.arc(lx + 8, legendY, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#333333'; ctx.textAlign = 'left';
+    ctx.fillText(l, lx + 22, legendY + 5);
+    lx += iW;
+  });
+
+  // Footer
+  const fY = EXP_H - 22;
+  ctx.fillStyle = '#999999'; ctx.font = '14px Arial';
+  ctx.textAlign = 'left';
+  ctx.fillText('Hills and Field AirWatch Monitoring Dashboard', PL, fY);
+  ctx.textAlign = 'right';
+  ctx.fillText(`Generated: ${new Date().toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })}`, PR, fY);
+}
+
+// ─── Build canvas from options ───
+function buildCanvas(opts) {
+  const canvas = document.createElement('canvas');
+  canvas.width = EXP_W; canvas.height = EXP_H;
+  const ctx = canvas.getContext('2d');
+  if (opts.type === 'overlay') drawOverlayChart(ctx, opts);
+  else if (opts.type === 'corr') drawCorrChart(ctx, opts);
+  else drawExportChart(ctx, opts);
+  return canvas;
+}
+
+// ─── PNG export ───
+async function doExportPNG(opts, filename) {
+  const canvas = buildCanvas(opts);
+  const a = document.createElement('a');
+  a.download = filename;
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+}
+
+// ─── PDF export (jsPDF, landscape, actual pixel size) ───
+async function doExportPDF(opts, filename) {
+  const canvas = buildCanvas(opts);
+  const { jsPDF } = await import('jspdf');
+  const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [EXP_W, EXP_H] });
+  pdf.setProperties({ title: opts.title || 'AirWatch', author: 'Hills and Field' });
+  pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, EXP_W, EXP_H);
+  pdf.save(filename);
+}
+
+// ─── SVG export — builds a true vector SVG from data ───
+function doExportSVG(opts, filename) {
+  const svgStr = buildSVGString(opts);
+  const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.download = filename;
+  a.href = url;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function buildSVGString(opts) {
+  if (opts.type === 'overlay') return buildOverlaySVG(opts);
+  if (opts.type === 'corr') return buildCorrSVG(opts);
+  return buildSingleSVG(opts);
+}
+
+function _svgHeader(title, subtitle) {
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${EXP_W}" height="${EXP_H}" viewBox="0 0 ${EXP_W} ${EXP_H}">`,
+    `<style>text{font-family:Arial,sans-serif;}</style>`,
+    `<rect width="${EXP_W}" height="${EXP_H}" fill="#ffffff"/>`,
+    `<text x="${EXP_W/2}" y="58" text-anchor="middle" font-size="36" font-weight="bold" fill="#1a1a1a">${escXML(title)}</text>`,
+    `<text x="${EXP_W/2}" y="100" text-anchor="middle" font-size="22" fill="#666666">${escXML(subtitle)}</text>`,
+  ].join('\n');
+}
+
+function _svgGrid(yTicks, toY, xIdxs, toX) {
+  const lines = [];
+  yTicks.forEach(t => {
+    const y = toY(t).toFixed(1);
+    lines.push(`<line x1="${PL}" y1="${y}" x2="${PR}" y2="${y}" stroke="#e0e0e0" stroke-width="1" stroke-dasharray="5,5"/>`);
+  });
+  xIdxs.forEach(i => {
+    const x = toX(i).toFixed(1);
+    lines.push(`<line x1="${x}" y1="${PT}" x2="${x}" y2="${PB}" stroke="#e0e0e0" stroke-width="1" stroke-dasharray="5,5"/>`);
+  });
+  return lines.join('\n');
+}
+
+function _svgBorder() {
+  return `<rect x="${PL}" y="${PT}" width="${PW}" height="${PH}" fill="none" stroke="#cccccc" stroke-width="1.5"/>`;
+}
+
+function _svgYAxis(yTicks, toY, yLabel) {
+  const lines = [];
+  yTicks.forEach(t => {
+    const y = toY(t).toFixed(1);
+    lines.push(`<text x="${PL - 10}" y="${(Number(y)+5).toFixed(1)}" text-anchor="end" font-size="16" fill="#333333">${escXML(fmtTick(t))}</text>`);
+  });
+  const cy = (PT + PH / 2).toFixed(1);
+  lines.push(`<text x="32" y="${cy}" text-anchor="middle" font-size="20" font-weight="bold" fill="#1a1a1a" transform="rotate(-90,32,${cy})">${escXML(yLabel)}</text>`);
+  return lines.join('\n');
+}
+
+function _svgXAxis(data, xIdxs, toX, rangeHours) {
+  const lines = [];
+  xIdxs.forEach(i => {
+    if (!data[i]) return;
+    const x = toX(i).toFixed(1);
+    const label = fmtXTick(data[i].timestamp, rangeHours);
+    lines.push(`<text x="${x}" y="${PB+18}" text-anchor="end" font-size="15" fill="#333333" transform="rotate(-45,${x},${PB+18})">${escXML(label)}</text>`);
+  });
+  lines.push(`<text x="${(PL+PW/2).toFixed(1)}" y="${PB+105}" text-anchor="middle" font-size="20" font-weight="bold" fill="#1a1a1a">Date &amp; Time</text>`);
+  return lines.join('\n');
+}
+
+function _svgFooter(fromTs, toTs) {
+  const fY = EXP_H - 22;
+  return [
+    `<text x="${PL}" y="${fY}" font-size="14" fill="#999999">${escXML('Hills and Field AirWatch Monitoring Dashboard')}</text>`,
+    `<text x="${PR}" y="${fY}" text-anchor="end" font-size="14" fill="#999999">${escXML(`Period: ${fmtPubDate(fromTs)} — ${fmtPubDate(toTs)}`)}</text>`,
+  ].join('\n');
+}
+
+function buildSingleSVG(opts) {
+  const { title, subtitle, dataKey, color, unit, data, showNcec, ncecLimit, ncecLabel } = opts;
+  const vals = data.map(d => d[dataKey]).filter(v => v != null && !isNaN(v)).map(Number);
+  const dataMax = vals.length ? Math.max(...vals) : 10;
+  const yDomain = Math.max(dataMax, showNcec && ncecLimit ? ncecLimit : 0) * 1.2 || 10;
+  const yTicks = computeAxisTicks(0, yDomain, 8);
+  const yMax = yTicks[yTicks.length - 1];
+  const toY = v => PT + PH - (v / yMax) * PH;
+  const toX = i => PL + (data.length > 1 ? (i / (data.length - 1)) * PW : PW / 2);
+  const rangeMs = data.length > 1 ? new Date(data[data.length-1].timestamp) - new Date(data[0].timestamp) : 86400000;
+  const rangeHours = rangeMs / 3600000;
+  const xIdxs = _getXIdxs(data.length);
+
+  // Data path
+  const pathParts = [];
+  data.forEach((d, i) => {
+    const v = d[dataKey]; if (v == null || isNaN(v)) return;
+    const x = toX(i).toFixed(1), y = toY(Number(v)).toFixed(1);
+    pathParts.push(pathParts.length === 0 ? `M${x},${y}` : `L${x},${y}`);
+  });
+
+  const legendY = PB + 150;
+  const legendItems = [
+    { label: `${title.replace(' Concentration', '')} Measured`, color, dashed: false },
+    ...(showNcec && ncecLimit != null ? [{ label: 'NCEC Standard', color: '#ef4444', dashed: true }] : []),
+  ];
+  const iW = 240;
+  let lx = EXP_W / 2 - (legendItems.length * iW) / 2;
+
+  const parts = [
+    _svgHeader(title, subtitle),
+    `<defs><clipPath id="pc"><rect x="${PL}" y="${PT}" width="${PW}" height="${PH}"/></clipPath></defs>`,
+    _svgGrid(yTicks, toY, xIdxs, toX),
+    showNcec && ncecLimit != null && ncecLimit <= yMax
+      ? `<rect x="${PL}" y="${PT}" width="${PW}" height="${Math.max(0,toY(ncecLimit)-PT).toFixed(1)}" fill="rgba(239,68,68,0.07)"/>`
+      : '',
+    pathParts.length ? `<path d="${pathParts.join(' ')}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" clip-path="url(#pc)"/>` : '',
+    showNcec && ncecLimit != null && ncecLimit <= yMax
+      ? `<line x1="${PL}" y1="${toY(ncecLimit).toFixed(1)}" x2="${PR}" y2="${toY(ncecLimit).toFixed(1)}" stroke="#ef4444" stroke-width="2" stroke-dasharray="10,6"/>
+         <text x="${PR+8}" y="${(toY(ncecLimit)+5).toFixed(1)}" font-size="15" fill="#ef4444">${escXML(ncecLabel||'')}</text>`
+      : '',
+    _svgBorder(),
+    _svgYAxis(yTicks, toY, `Concentration (${unit})`),
+    _svgXAxis(data, xIdxs, toX, rangeHours),
+    legendItems.map(item => {
+      const x = lx;
+      lx += iW;
+      return `<line x1="${x}" y1="${legendY}" x2="${x+32}" y2="${legendY}" stroke="${item.color}" stroke-width="2.5"${item.dashed?' stroke-dasharray="8,5"':''}/>
+              <text x="${x+40}" y="${legendY+5}" font-size="16" fill="#333333">${escXML(item.label)}</text>`;
+    }).join('\n'),
+    _svgFooter(data[0]?.timestamp, data[data.length-1]?.timestamp),
+    '</svg>',
+  ];
+  return parts.join('\n');
+}
+
+function buildOverlaySVG(opts) {
+  const { title, subtitle, activePollutants, data } = opts;
+  let allMax = 0;
+  activePollutants.forEach(p => data.forEach(d => {
+    const v = d[p.key]; if (v != null && !isNaN(v)) allMax = Math.max(allMax, Number(v));
+  }));
+  const yTicks = computeAxisTicks(0, allMax * 1.2 || 10, 8);
+  const yMax = yTicks[yTicks.length - 1];
+  const toY = v => PT + PH - (v / yMax) * PH;
+  const toX = i => PL + (data.length > 1 ? (i / (data.length - 1)) * PW : PW / 2);
+  const rangeMs = data.length > 1 ? new Date(data[data.length-1].timestamp) - new Date(data[0].timestamp) : 86400000;
+  const rangeHours = rangeMs / 3600000;
+  const xIdxs = _getXIdxs(data.length);
+
+  const legendY = PB + 150;
+  const iW = 190;
+  let lx = EXP_W / 2 - (activePollutants.length * iW) / 2;
+
+  const parts = [
+    _svgHeader(title, subtitle),
+    `<defs><clipPath id="pc"><rect x="${PL}" y="${PT}" width="${PW}" height="${PH}"/></clipPath></defs>`,
+    _svgGrid(yTicks, toY, xIdxs, toX),
+    activePollutants.map(p => {
+      const pathParts = [];
+      data.forEach((d, i) => {
+        const v = d[p.key]; if (v == null || isNaN(v)) return;
+        pathParts.push(pathParts.length === 0 ? `M${toX(i).toFixed(1)},${toY(Number(v)).toFixed(1)}` : `L${toX(i).toFixed(1)},${toY(Number(v)).toFixed(1)}`);
+      });
+      return pathParts.length ? `<path d="${pathParts.join(' ')}" fill="none" stroke="${p.color}" stroke-width="2.5" stroke-linejoin="round" clip-path="url(#pc)"/>` : '';
+    }).join('\n'),
+    _svgBorder(),
+    _svgYAxis(yTicks, toY, 'Concentration (µg/m³)'),
+    _svgXAxis(data, xIdxs, toX, rangeHours),
+    activePollutants.map(p => {
+      const x = lx; lx += iW;
+      return `<line x1="${x}" y1="${legendY}" x2="${x+32}" y2="${legendY}" stroke="${p.color}" stroke-width="2.5"/>
+              <text x="${x+40}" y="${legendY+5}" font-size="16" fill="#333333">${escXML(p.name)}</text>`;
+    }).join('\n'),
+    _svgFooter(data[0]?.timestamp, data[data.length-1]?.timestamp),
+    '</svg>',
+  ];
+  return parts.join('\n');
+}
+
+function buildCorrSVG(opts) {
+  const { title, subtitle, xParam, yParam, points, trendData } = opts;
+  if (!points.length) return `<svg xmlns="http://www.w3.org/2000/svg" width="${EXP_W}" height="${EXP_H}"><rect width="${EXP_W}" height="${EXP_H}" fill="#fff"/><text x="${EXP_W/2}" y="${EXP_H/2}" text-anchor="middle" font-family="Arial" font-size="24" fill="#999">No data</text></svg>`;
+
+  const xs = points.map(p => p.x), ys = points.map(p => p.y);
+  const xPad = (Math.max(...xs) - Math.min(...xs)) * 0.08 || 1;
+  const yPad = (Math.max(...ys) - Math.min(...ys)) * 0.08 || 1;
+  const xDom = [Math.min(...xs) - xPad, Math.max(...xs) + xPad];
+  const yDom = [Math.min(...ys) - yPad, Math.max(...ys) + yPad];
+  const toX = v => PL + ((v - xDom[0]) / (xDom[1] - xDom[0])) * PW;
+  const toY = v => PT + PH - ((v - yDom[0]) / (yDom[1] - yDom[0])) * PH;
+  const xTicks = computeAxisTicks(xDom[0], xDom[1], 8);
+  const yTicks = computeAxisTicks(yDom[0], yDom[1], 8);
+
+  const legendY = PB + 148;
+  const aqiItems = [['#16A34A','Good'],['#CA8A04','Moderate'],['#EA580C','Sensitive'],['#DC2626','Unhealthy'],['#7C3AED','Very Unhealthy'],['#94a3b8','Unknown']];
+  const iW = 270;
+  let lx = EXP_W / 2 - (aqiItems.length * iW) / 2;
+
+  const parts = [
+    _svgHeader(title, subtitle),
+    `<defs>
+      <clipPath id="pc"><rect x="${PL}" y="${PT}" width="${PW}" height="${PH}"/></clipPath>
+    </defs>`,
+    yTicks.filter(t => t >= yDom[0] && t <= yDom[1]).map(t => `<line x1="${PL}" y1="${toY(t).toFixed(1)}" x2="${PR}" y2="${toY(t).toFixed(1)}" stroke="#e0e0e0" stroke-width="1" stroke-dasharray="5,5"/>`).join('\n'),
+    xTicks.filter(t => t >= xDom[0] && t <= xDom[1]).map(t => `<line x1="${toX(t).toFixed(1)}" y1="${PT}" x2="${toX(t).toFixed(1)}" y2="${PB}" stroke="#e0e0e0" stroke-width="1" stroke-dasharray="5,5"/>`).join('\n'),
+    `<g clip-path="url(#pc)">`,
+    points.map(p => {
+      const c = p.aqi == null ? '#94a3b8' : p.aqi <= 50 ? '#16A34A' : p.aqi <= 100 ? '#CA8A04' : p.aqi <= 150 ? '#EA580C' : p.aqi <= 200 ? '#DC2626' : '#7C3AED';
+      return `<circle cx="${toX(p.x).toFixed(1)}" cy="${toY(p.y).toFixed(1)}" r="5" fill="${c}" fill-opacity="0.8"/>`;
+    }).join('\n'),
+    trendData.length === 2
+      ? `<line x1="${toX(trendData[0].x).toFixed(1)}" y1="${toY(trendData[0].y).toFixed(1)}" x2="${toX(trendData[1].x).toFixed(1)}" y2="${toY(trendData[1].y).toFixed(1)}" stroke="#0d9488" stroke-width="2" stroke-dasharray="8,5"/>`
+      : '',
+    '</g>',
+    _svgBorder(),
+    yTicks.filter(t => t >= yDom[0] && t <= yDom[1]).map(t => `<text x="${PL-10}" y="${(toY(t)+5).toFixed(1)}" text-anchor="end" font-size="16" fill="#333333">${escXML(fmtTick(t))}</text>`).join('\n'),
+    `<text x="32" y="${(PT+PH/2).toFixed(1)}" text-anchor="middle" font-size="20" font-weight="bold" fill="#1a1a1a" transform="rotate(-90,32,${(PT+PH/2).toFixed(1)})">${escXML(`${yParam.name} (${yParam.unit})`)}</text>`,
+    xTicks.filter(t => t >= xDom[0] && t <= xDom[1]).map(t => `<text x="${toX(t).toFixed(1)}" y="${PB+18}" text-anchor="end" font-size="15" fill="#333333" transform="rotate(-45,${toX(t).toFixed(1)},${PB+18})">${escXML(fmtTick(t))}</text>`).join('\n'),
+    `<text x="${(PL+PW/2).toFixed(1)}" y="${PB+105}" text-anchor="middle" font-size="20" font-weight="bold" fill="#1a1a1a">${escXML(`${xParam.name} (${xParam.unit})`)}</text>`,
+    aqiItems.map(([c, l]) => {
+      const x = lx; lx += iW;
+      return `<circle cx="${x+8}" cy="${legendY}" r="7" fill="${c}" fill-opacity="0.8"/>
+              <text x="${x+22}" y="${legendY+5}" font-size="15" fill="#333333">${escXML(l)}</text>`;
+    }).join('\n'),
+    `<text x="${PL}" y="${EXP_H-22}" font-size="14" fill="#999999">${escXML('Hills and Field AirWatch Monitoring Dashboard')}</text>`,
+    `<text x="${PR}" y="${EXP_H-22}" text-anchor="end" font-size="14" fill="#999999">${escXML(`Generated: ${new Date().toLocaleString('en-GB', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}`)}</text>`,
+    '</svg>',
+  ];
+  return parts.join('\n');
+}
+
+// ─── Unified export dispatcher ───
+async function runExport(fmt, opts) {
+  const fromTs = opts.fromTs ?? opts.data?.[0]?.timestamp ?? null;
+  const toTs   = opts.toTs   ?? opts.data?.[opts.data?.length-1]?.timestamp ?? null;
+  const filename = buildFilename(opts.filenameTag || 'Chart', fromTs, toTs, fmt);
+
+  if (fmt === 'png') await doExportPNG(opts, filename);
+  else if (fmt === 'pdf') await doExportPDF(opts, filename);
+  else doExportSVG(opts, filename);
+}
+
+// ─── Export hook (no hidden DOM, no html2canvas) ───
 function useChartExport() {
   const [dlOpen, setDlOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [exportFmt, setExportFmt] = useState(null);
-  const pubRef = useRef(null);
+  const optsRef = useRef(null);
 
-  function triggerExport(fmt) {
+  function triggerExport(fmt, getOpts) {
     setDlOpen(false);
-    setExportFmt(fmt);
+    optsRef.current = { fmt, getOpts };
     setExporting(true);
   }
 
   useEffect(() => {
-    if (!exporting || !pubRef.current) return;
+    if (!exporting || !optsRef.current) return;
     let alive = true;
-    const timer = setTimeout(async () => {
-      if (!alive) return;
-      try {
-        // filename is read from the pubRef's data-filename attribute
-        const filename = pubRef.current?.dataset?.filename || 'AirWatch_export';
-        await captureAndDownload(pubRef.current, filename, exportFmt);
-      } finally {
-        if (alive) setExporting(false);
-      }
-    }, 320);
-    return () => { alive = false; clearTimeout(timer); };
+    const { fmt, getOpts } = optsRef.current;
+    (async () => {
+      try { await runExport(fmt, getOpts()); }
+      finally { if (alive) setExporting(false); }
+    })();
+    return () => { alive = false; };
   }, [exporting]);
 
-  return { dlOpen, setDlOpen, exporting, triggerExport, pubRef };
+  return { dlOpen, setDlOpen, exporting, triggerExport };
 }
 
-// ─── Download button UI ───
-function DlButton({ dlOpen, setDlOpen, triggerExport, exporting, label = 'Export' }) {
+// ─── Download dropdown UI ───
+function DlButton({ dlOpen, setDlOpen, onExport, exporting, label = 'Export' }) {
   return (
     <div style={{ position: 'relative' }}>
       <button onClick={() => setDlOpen(o => !o)} disabled={exporting} style={{
@@ -340,15 +816,15 @@ function DlButton({ dlOpen, setDlOpen, triggerExport, exporting, label = 'Export
             { fmt: 'png', label: 'Download PNG (300 DPI)' },
             { fmt: 'pdf', label: 'Download PDF' },
             { fmt: 'svg', label: 'Download SVG' },
-          ].map(({ fmt, label }) => (
-            <button key={fmt} onClick={() => triggerExport(fmt)} style={{
+          ].map(({ fmt, label: lbl }) => (
+            <button key={fmt} onClick={() => onExport(fmt)} style={{
               display: 'block', width: '100%', textAlign: 'left', padding: '7px 12px',
               borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 11,
               fontFamily: 'var(--font)', color: 'var(--text)', background: 'transparent', transition: 'background 0.15s',
             }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.5)'}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-            >{label}</button>
+            >{lbl}</button>
           ))}
         </div>
       )}
@@ -363,17 +839,15 @@ function GasChart({ pollutant, allData, stationName }) {
   const [chartRange, setChartRange] = useState('24h');
   const [showNcec, setShowNcec] = useState(true);
   const [ncecStdIdx, setNcecStdIdx] = useState(0);
-  const { dlOpen, setDlOpen, exporting, triggerExport, pubRef } = useChartExport();
+  const { dlOpen, setDlOpen, exporting, triggerExport } = useChartExport();
 
-  // NCEC standards for this pollutant
   const ncecStds = (NCEC_STANDARDS[key]?.standards) || [];
-  const ncecStd = ncecStds[ncecStdIdx] || null;
+  const ncecStd  = ncecStds[ncecStdIdx] || null;
   const ncecLimit = ncecStd?.limit ?? threshold;
   const ncecLabel = ncecStd
     ? `NCEC ${ncecStd.period}: ${ncecLimit} ${unit}`
     : `NCEC: ${threshold} ${unit}`;
 
-  // Filter allData to this chart's time range
   const chartData = useMemo(() => {
     const hours = { '1h':1,'6h':6,'12h':12,'24h':24,'7d':168,'30d':720 }[chartRange] || 24;
     const cutoff = allData.length
@@ -384,26 +858,34 @@ function GasChart({ pollutant, allData, stationName }) {
       .map(r => ({ ...r, time: hours <= 24 ? formatTime(r.timestamp) : formatDate(r.timestamp) }));
   }, [allData, chartRange]);
 
-  const values   = chartData.map(d => d[key]).filter(v => v != null);
-  const current  = values.length ? values[values.length - 1] : null;
-  const avg      = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
-  const min      = values.length ? Math.min(...values) : null;
-  const maxVal   = values.length ? Math.max(...values) : null;
-  const over     = current != null && current > threshold;
-  const prevAvg  = values.length > 4 ? values.slice(0, Math.floor(values.length / 2)).reduce((a, b) => a + b, 0) / Math.floor(values.length / 2) : null;
-  const trend    = avg && prevAvg ? (avg > prevAvg ? 'up' : 'down') : null;
+  const values  = chartData.map(d => d[key]).filter(v => v != null);
+  const current = values.length ? values[values.length - 1] : null;
+  const avg     = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+  const min     = values.length ? Math.min(...values) : null;
+  const maxVal  = values.length ? Math.max(...values) : null;
+  const over    = current != null && current > threshold;
+  const prevAvg = values.length > 4 ? values.slice(0, Math.floor(values.length / 2)).reduce((a, b) => a + b, 0) / Math.floor(values.length / 2) : null;
+  const trend   = avg && prevAvg ? (avg > prevAvg ? 'up' : 'down') : null;
   const trendPct = avg && prevAvg ? Math.abs(((avg - prevAvg) / prevAvg) * 100).toFixed(0) : null;
 
   const fromTs = chartData[0]?.timestamp;
   const toTs   = chartData[chartData.length - 1]?.timestamp;
-  const filename = buildExportFilename(key.toUpperCase(), stationName, fromTs, toTs, exporting ? 'png' : 'png');
+
+  const getExportOpts = () => ({
+    type: 'single',
+    title: `${name} Concentration`,
+    subtitle: fmtSubtitleRange(fromTs, toTs),
+    dataKey: key, color, unit, data: chartData,
+    showNcec, ncecLimit, ncecLabel,
+    filenameTag: key.toUpperCase(),
+    fromTs, toTs,
+  });
 
   return (
     <div style={{ ...glass({ padding: '16px 18px' }), animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) both', position: 'relative' }}>
 
       {/* ── Control bar ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
-        {/* Time range quick buttons */}
         <div style={{ ...glassInner({ padding: '2px 3px', borderRadius: 9 }), display: 'flex', gap: 1 }}>
           {['1h','6h','12h','24h','7d','30d'].map(t => (
             <button key={t} onClick={() => setChartRange(t)} style={{
@@ -415,8 +897,6 @@ function GasChart({ pollutant, allData, stationName }) {
             }}>{t}</button>
           ))}
         </div>
-
-        {/* Right: NCEC toggle + standard selector + download */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 10, color: 'var(--text-muted)', userSelect: 'none' }}>
             <input type="checkbox" checked={showNcec} onChange={e => setShowNcec(e.target.checked)} style={{ cursor: 'pointer', accentColor: '#DC2626' }} />
@@ -431,7 +911,8 @@ function GasChart({ pollutant, allData, stationName }) {
               {ncecStds.map((s, i) => <option key={i} value={i}>{s.period}: {s.limit}</option>)}
             </select>
           )}
-          <DlButton dlOpen={dlOpen} setDlOpen={setDlOpen} triggerExport={triggerExport} exporting={exporting} />
+          <DlButton dlOpen={dlOpen} setDlOpen={setDlOpen} exporting={exporting}
+            onExport={fmt => triggerExport(fmt, getExportOpts)} />
         </div>
       </div>
 
@@ -490,24 +971,6 @@ function GasChart({ pollutant, allData, stationName }) {
           </div>
         ))}
       </div>
-
-      {/* ── Hidden publication chart for export ── */}
-      {exporting && (
-        <div
-          ref={pubRef}
-          data-filename={buildExportFilename(key.toUpperCase(), stationName, fromTs, toTs, 'png')}
-          style={{ position: 'fixed', left: '-9999px', top: 0, width: 1200, padding: '28px 36px', border: '1px solid #111', background: '#fff', zIndex: -1 }}
-        >
-          <PubChartContent
-            pollutant={pollutant}
-            data={chartData}
-            stationName={stationName}
-            showNcec={showNcec}
-            ncecLimit={ncecLimit}
-            ncecLabel={ncecLabel}
-          />
-        </div>
-      )}
     </div>
   );
 }
@@ -579,7 +1042,7 @@ function aqiDotColor(aqi) {
 function CorrelationChart({ data, stationName }) {
   const [xKey, setXKey] = useState('wind_speed');
   const [yKey, setYKey] = useState('pm25');
-  const { dlOpen, setDlOpen, exporting, triggerExport, pubRef } = useChartExport();
+  const { dlOpen, setDlOpen, exporting, triggerExport } = useChartExport();
 
   const xParam = CORR_PARAMS.find(p => p.key === xKey) || CORR_PARAMS[0];
   const yParam = CORR_PARAMS.find(p => p.key === yKey) || CORR_PARAMS[1];
@@ -609,6 +1072,15 @@ function CorrelationChart({ data, stationName }) {
     return <circle cx={cx} cy={cy} r={3} fill={aqiDotColor(payload.aqi)} fillOpacity={0.75} stroke="none" />;
   };
 
+  const getExportOpts = () => ({
+    type: 'corr',
+    title: `Pollutant Correlation: ${xParam.name} vs ${yParam.name}`,
+    subtitle: `Pearson R = ${r.toFixed(3)} · ${rInterpret(r)}`,
+    xParam, yParam, points, trendData, rValue: r,
+    filenameTag: `Corr_${xKey}_vs_${yKey}`,
+    fromTs: null, toTs: null,
+  });
+
   return (
     <div style={{ ...glass({ padding: '20px 24px' }), marginTop: 20, animation: 'glassIn 0.5s cubic-bezier(.16,1,.3,1) both' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
@@ -624,7 +1096,8 @@ function CorrelationChart({ data, stationName }) {
               {p.label}
             </button>
           ))}
-          <DlButton dlOpen={dlOpen} setDlOpen={setDlOpen} triggerExport={triggerExport} exporting={exporting} />
+          <DlButton dlOpen={dlOpen} setDlOpen={setDlOpen} exporting={exporting}
+            onExport={fmt => triggerExport(fmt, getExportOpts)} />
         </div>
       </div>
 
@@ -694,21 +1167,6 @@ function CorrelationChart({ data, stationName }) {
           </div>
         ))}
       </div>
-
-      {/* Hidden pub chart */}
-      {exporting && (
-        <div
-          ref={pubRef}
-          data-filename={buildExportFilename(`Corr_${xKey}_vs_${yKey}`, stationName, null, null, 'png')}
-          style={{ position: 'fixed', left: '-9999px', top: 0, width: 1200, padding: '28px 36px', border: '1px solid #111', background: '#fff', zIndex: -1 }}
-        >
-          <PubCorrContent
-            xParam={xParam} yParam={yParam}
-            points={points} trendData={trendData} rValue={r}
-            stationName={stationName}
-          />
-        </div>
-      )}
     </div>
   );
 }
@@ -717,6 +1175,7 @@ function CorrelationChart({ data, stationName }) {
 export default function Charts({ profile }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isPhone, setIsPhone]   = useState(window.innerWidth < 480);
+
   useEffect(() => {
     const handle = () => { setIsMobile(window.innerWidth < 768); setIsPhone(window.innerWidth < 480); };
     window.addEventListener('resize', handle);
@@ -727,7 +1186,7 @@ export default function Charts({ profile }) {
   const [stations, setStations]       = useState([]);
   const [selIdx, setSelIdx]           = useState(0);
   const [timeRange, setTimeRange]     = useState('24h');
-  const [allData, setAllData]         = useState([]);   // full 30d history
+  const [allData, setAllData]         = useState([]);
   const [overlayKeys, setOverlayKeys] = useState(['pm25', 'pm10', 'o3']);
 
   // Multi-overlay export
@@ -758,7 +1217,6 @@ export default function Charts({ profile }) {
     }
   }, [stationId, stations]);
 
-  // Always load 720h (30d) so per-chart ranges can filter as needed
   useEffect(() => {
     if (!stations.length) return;
     const sid = stations[selIdx]?.id;
@@ -772,7 +1230,6 @@ export default function Charts({ profile }) {
 
   const station = stations[selIdx] || {};
 
-  // data = allData filtered to global timeRange (for table + multi-overlay)
   const data = useMemo(() => {
     const hours = { '1h':1,'6h':6,'12h':12,'24h':24,'7d':168,'30d':720 }[timeRange] || 24;
     const cutoff = allData.length
@@ -853,6 +1310,15 @@ export default function Charts({ profile }) {
   const activePollutants = POLLUTANTS.filter(p => overlayKeys.includes(p.key));
   const overlayFromTs = data[0]?.timestamp, overlayToTs = data[data.length - 1]?.timestamp;
 
+  const getOverlayExportOpts = () => ({
+    type: 'overlay',
+    title: 'Multi-Pollutant Overlay',
+    subtitle: fmtSubtitleRange(overlayFromTs, overlayToTs),
+    activePollutants, data,
+    filenameTag: 'MultiPollutant',
+    fromTs: overlayFromTs, toTs: overlayToTs,
+  });
+
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
 
@@ -896,7 +1362,7 @@ export default function Charts({ profile }) {
         </div>
       </div>
 
-      {/* Gas charts grid — each has its own range selector + export */}
+      {/* Gas charts grid */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 14, marginBottom: 16 }}>
         {POLLUTANTS.map(p => (
           <GasChart key={p.key} pollutant={p} allData={allData} stationName={station.name || '—'} />
@@ -911,7 +1377,8 @@ export default function Charts({ profile }) {
             <p style={{ color: 'var(--text-faint)', fontSize: 11, margin: '2px 0 0' }}>Compare pollutants on one chart — click to toggle</p>
           </div>
           <DlButton dlOpen={overlayExport.dlOpen} setDlOpen={overlayExport.setDlOpen}
-            triggerExport={overlayExport.triggerExport} exporting={overlayExport.exporting} />
+            exporting={overlayExport.exporting}
+            onExport={fmt => overlayExport.triggerExport(fmt, getOverlayExportOpts)} />
         </div>
         <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
           {POLLUTANTS.map(p => (
@@ -937,17 +1404,6 @@ export default function Charts({ profile }) {
             ))}
           </LineChart>
         </ResponsiveContainer>
-
-        {/* Hidden pub chart for overlay export */}
-        {overlayExport.exporting && (
-          <div
-            ref={overlayExport.pubRef}
-            data-filename={buildExportFilename('MultiOverlay', station.name, overlayFromTs, overlayToTs, 'png')}
-            style={{ position: 'fixed', left: '-9999px', top: 0, width: 1200, padding: '28px 36px', border: '1px solid #111', background: '#fff', zIndex: -1 }}
-          >
-            <PubOverlayContent activePollutants={activePollutants} data={data} stationName={station.name || '—'} />
-          </div>
-        )}
       </div>
 
       {/* Correlation Analysis */}
