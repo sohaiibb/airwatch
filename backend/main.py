@@ -139,15 +139,15 @@ def calc_aqi(pm25):
 # Used by both live polling and backfill
 # ─────────────────────────────────────────────────────────────────────────────
 
-# EnggEnv API returns timestamps in UTC. We convert to AST (Arabia Standard
-# Time, UTC+3) before storing so the frontend displays local Saudi time.
+# EnggEnv API returns timestamps in AST (Arabia Standard Time, UTC+3).
+# Subtract 3h to store as UTC so the browser (UTC+3) restores the correct local time.
 _AST_OFFSET = timedelta(hours=3)
 
-def enggenv_ts_to_ast(ts_str: str) -> str:
-    """Convert an EnggEnv UTC timestamp to AST (UTC+3) for storage."""
+def enggenv_ts_to_utc(ts_str: str) -> str:
+    """Convert an EnggEnv AST timestamp to UTC (subtract 3h) for storage."""
     try:
-        dt_utc = datetime.strptime(ts_str.strip(), "%Y-%m-%d %H:%M:%S")
-        return (dt_utc + _AST_OFFSET).strftime("%Y-%m-%d %H:%M:%S")
+        dt_ast = datetime.strptime(ts_str.strip(), "%Y-%m-%d %H:%M:%S")
+        return (dt_ast - _AST_OFFSET).strftime("%Y-%m-%d %H:%M:%S")
     except (ValueError, AttributeError):
         return ts_str
 
@@ -180,9 +180,9 @@ def parse_enggenv_record(raw: dict, station_id: str, field_mapping: dict = None)
         except (TypeError, ValueError):
             return None
 
-    # EnggEnv returns UTC — convert to AST (UTC+3) before storing
+    # EnggEnv returns AST — subtract 3h to store as UTC
     raw_ts = raw.get("timestamp", datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"))
-    ts = enggenv_ts_to_ast(raw_ts)
+    ts = enggenv_ts_to_utc(raw_ts)
 
     rec = {
         "station_id":     station_id,
@@ -239,7 +239,7 @@ async def poll_enggenv(client, station):
         raw_ts = data.get("timestamp") or datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
         return {
             "station_id":     station["id"],
-            "timestamp":      enggenv_ts_to_ast(raw_ts),
+            "timestamp":      enggenv_ts_to_utc(raw_ts),
             "pm25":           gf("PM2.5"),
             "pm10":           gf("pm10"),
             "so2":            gf("so2"),
@@ -333,53 +333,55 @@ async def poll_all():
 
 scheduler = AsyncIOScheduler()
 
-def run_ast_migration():
+def run_timestamp_migration():
     """
-    One-time migration: add 3 hours to all existing EnggEnv readings that were
-    stored in UTC. Uses system_settings key 'ast_migration_v1' as a run-once flag.
+    One-time migration: subtract 3 hours from all existing EnggEnv readings
+    that were stored as AST treated as UTC (i.e. 3h ahead of correct UTC).
+    Uses system_settings key 'utc_to_ast_done' as a run-once flag.
+    Runs row-by-row via the Supabase REST client (no DATABASE_URL required).
     """
     if not sb:
         return
     try:
-        # Check if migration has already run
-        flag = sb.table("system_settings").select("value").eq("key", "ast_migration_v1").execute()
-        if flag.data and flag.data[0].get("value", {}).get("done"):
-            print("[Migration] ast_migration_v1 already applied — skipping")
+        result = sb.table("system_settings").select("value").eq("key", "utc_to_ast_done").execute()
+        if result.data:
+            print("[Migration] UTC→AST timestamp fix already applied")
             return
     except Exception:
-        pass  # system_settings may not exist yet — proceed anyway
+        pass
 
-    print("[Migration] Running ast_migration_v1: shifting EnggEnv timestamps +3h (UTC→AST)…")
+    print("[Migration] Fixing enggenv timestamps: subtracting 3h (stored AST → UTC)...")
+    offset = 0
+    total_fixed = 0
     try:
-        # PostgREST doesn't support raw SQL via the REST API.
-        # Use the rpc endpoint if a function exists, otherwise fall back to DATABASE_URL.
-        if DATABASE_URL:
-            import psycopg2
-            conn = psycopg2.connect(DATABASE_URL)
-            conn.autocommit = True
-            cur = conn.cursor()
-            cur.execute(
-                "UPDATE readings SET timestamp = timestamp + interval '3 hours' "
-                "WHERE source = 'enggenv';"
-            )
-            rows = cur.rowcount
-            cur.close()
-            conn.close()
-            print(f"[Migration] ✓ Updated {rows} EnggEnv readings +3h")
-        else:
-            print("[Migration] ⚠️  DATABASE_URL not set — cannot run SQL migration automatically.")
-            print("[Migration]    Run this manually in Supabase SQL Editor:")
-            print("    UPDATE readings SET timestamp = timestamp + interval '3 hours'")
-            print("    WHERE source = 'enggenv';")
+        while True:
+            batch = sb.table("readings").select("id, timestamp").eq("source", "enggenv").range(offset, offset + 999).execute()
+            if not batch.data:
+                break
+            for row in batch.data:
+                try:
+                    old_ts = row["timestamp"]
+                    dt = datetime.fromisoformat(old_ts.replace("Z", "+00:00")) if "T" in old_ts else datetime.strptime(old_ts, "%Y-%m-%d %H:%M:%S")
+                    # Strip timezone info so arithmetic is naive, then subtract 3h
+                    dt_naive = dt.replace(tzinfo=None)
+                    new_dt = dt_naive - timedelta(hours=3)
+                    new_ts = new_dt.strftime("%Y-%m-%d %H:%M:%S")
+                    sb.table("readings").update({"timestamp": new_ts}).eq("id", row["id"]).execute()
+                    total_fixed += 1
+                except Exception as e:
+                    print(f"[Migration] Error fixing row {row['id']}: {e}")
+            offset += 1000
+            print(f"[Migration] Fixed {total_fixed} readings so far...")
 
-        # Mark as done regardless (if no DATABASE_URL, operator must run SQL manually)
         sb.table("system_settings").upsert(
-            {"key": "ast_migration_v1", "value": {"done": True, "ran_at": datetime.utcnow().isoformat()}},
+            {"key": "utc_to_ast_done", "value": {"done": True, "count": total_fixed}},
             on_conflict="key"
         ).execute()
-        print("[Migration] ast_migration_v1 flag set")
+        print(f"[Migration] ✓ Fixed {total_fixed} enggenv timestamps (-3h)")
     except Exception as e:
-        print(f"[Migration] ERROR during ast_migration_v1: {e}")
+        print(f"[Migration] timestamp migration error: {e}")
+        import traceback
+        traceback.print_exc()
 
 @asynccontextmanager
 async def lifespan(app):
@@ -398,8 +400,8 @@ async def lifespan(app):
     else:
         print("[ALERT ENGINE] ✓ All alert tables present")
 
-    # One-time migration: shift all existing EnggEnv readings +3 hours (UTC→AST)
-    run_ast_migration()
+    # One-time migration: fix historical enggenv timestamps (subtract 3h)
+    run_timestamp_migration()
 
     pi = int(os.getenv("POLL_INTERVAL", "300"))
     asyncio.create_task(poll_all())

@@ -55,14 +55,15 @@ ENGGENV_BASE  = "https://apis.enggenv.com/api/v1/uz/data"
 
 UPSERT_BATCH  = 500   # rows per Supabase upsert call
 
-# EnggEnv API returns timestamps in UTC. Add 3h to store as AST (UTC+3).
+# EnggEnv API returns timestamps in AST (UTC+3). Subtract 3h to store as UTC
+# so the browser (UTC+3) restores the correct local time on display.
 _AST_OFFSET = timedelta(hours=3)
 
-def enggenv_ts_to_ast(ts_str: str) -> str:
-    """Convert an EnggEnv UTC timestamp string to AST (UTC+3) for storage."""
+def enggenv_ts_to_utc(ts_str: str) -> str:
+    """Convert an EnggEnv AST timestamp to UTC (subtract 3h) for storage."""
     try:
-        dt_utc = datetime.strptime(ts_str.strip(), "%Y-%m-%d %H:%M:%S")
-        return (dt_utc + _AST_OFFSET).strftime("%Y-%m-%d %H:%M:%S")
+        dt_ast = datetime.strptime(ts_str.strip(), "%Y-%m-%d %H:%M:%S")
+        return (dt_ast - _AST_OFFSET).strftime("%Y-%m-%d %H:%M:%S")
     except (ValueError, AttributeError):
         return ts_str
 
@@ -100,7 +101,7 @@ def parse_record(raw: dict, station_id: str, field_mapping: dict = None) -> dict
             return None
 
     raw_ts = raw.get("timestamp", datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"))
-    ts = enggenv_ts_to_ast(raw_ts)
+    ts = enggenv_ts_to_utc(raw_ts)
 
     rec = {
         "station_id":     station_id,
