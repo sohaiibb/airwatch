@@ -356,9 +356,9 @@ async def _startup_background():
 
 @asynccontextmanager
 async def lifespan(app):
-    pi = int(os.getenv("POLL_INTERVAL", "300"))
-    # Schedule recurring jobs
-    scheduler.add_job(poll_all, "interval", seconds=pi)
+    pi = int(os.getenv("POLL_INTERVAL", "60"))
+    # Schedule recurring jobs — id + replace_existing prevents duplicate jobs on reload
+    scheduler.add_job(poll_all, "interval", seconds=pi, id="poll_all_job", replace_existing=True)
     if alert_engine:
         scheduler.add_job(alert_engine.run, "interval", seconds=300, id="alert_check")
     scheduler.start()
