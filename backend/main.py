@@ -334,30 +334,36 @@ async def poll_all():
 scheduler = AsyncIOScheduler()
 
 
-@asynccontextmanager
-async def lifespan(app):
-    # Auto-migrate alert tables if DATABASE_URL is set
+async def _startup_background():
+    """Run non-critical startup tasks after the server is already accepting requests."""
+    # Auto-migrate alert tables (fast DDL; no-op if DATABASE_URL not set)
     run_alert_migration()
-
-    # Startup DB health check — log clearly if tables are missing
+    # Log DB health — purely informational, doesn't block startup
     health = check_alert_db_health()
     if not health["healthy"]:
         print("\n" + "="*60)
         print("[ALERT ENGINE] ⚠️  DATABASE TABLES MISSING")
         print(f"  Missing: {health.get('missing_tables', [])}")
         print(f"  Fix: Run database/alerts_schema.sql in the Supabase SQL editor")
-        print(f"  OR:  Set DATABASE_URL env var for auto-migration on next restart")
         print("="*60 + "\n")
     else:
         print("[ALERT ENGINE] ✓ All alert tables present")
+    # First poll + alert check
+    await poll_all()
+    if alert_engine:
+        await asyncio.to_thread(alert_engine.run)
 
+
+@asynccontextmanager
+async def lifespan(app):
     pi = int(os.getenv("POLL_INTERVAL", "300"))
-    asyncio.create_task(poll_all())
+    # Schedule recurring jobs
     scheduler.add_job(poll_all, "interval", seconds=pi)
     if alert_engine:
         scheduler.add_job(alert_engine.run, "interval", seconds=300, id="alert_check")
-        asyncio.create_task(asyncio.to_thread(alert_engine.run))
     scheduler.start()
+    # Fire startup tasks in background — server is already healthy by this point
+    asyncio.create_task(_startup_background())
     yield
     scheduler.shutdown()
 
