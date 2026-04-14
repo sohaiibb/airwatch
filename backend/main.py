@@ -333,55 +333,6 @@ async def poll_all():
 
 scheduler = AsyncIOScheduler()
 
-def run_timestamp_migration():
-    """
-    One-time migration: subtract 3 hours from all existing EnggEnv readings
-    that were stored as AST treated as UTC (i.e. 3h ahead of correct UTC).
-    Uses system_settings key 'utc_to_ast_done' as a run-once flag.
-    Runs row-by-row via the Supabase REST client (no DATABASE_URL required).
-    """
-    if not sb:
-        return
-    try:
-        result = sb.table("system_settings").select("value").eq("key", "utc_to_ast_done").execute()
-        if result.data:
-            print("[Migration] UTC→AST timestamp fix already applied")
-            return
-    except Exception:
-        pass
-
-    print("[Migration] Fixing enggenv timestamps: subtracting 3h (stored AST → UTC)...")
-    offset = 0
-    total_fixed = 0
-    try:
-        while True:
-            batch = sb.table("readings").select("id, timestamp").eq("source", "enggenv").range(offset, offset + 999).execute()
-            if not batch.data:
-                break
-            for row in batch.data:
-                try:
-                    old_ts = row["timestamp"]
-                    dt = datetime.fromisoformat(old_ts.replace("Z", "+00:00")) if "T" in old_ts else datetime.strptime(old_ts, "%Y-%m-%d %H:%M:%S")
-                    # Strip timezone info so arithmetic is naive, then subtract 3h
-                    dt_naive = dt.replace(tzinfo=None)
-                    new_dt = dt_naive - timedelta(hours=3)
-                    new_ts = new_dt.strftime("%Y-%m-%d %H:%M:%S")
-                    sb.table("readings").update({"timestamp": new_ts}).eq("id", row["id"]).execute()
-                    total_fixed += 1
-                except Exception as e:
-                    print(f"[Migration] Error fixing row {row['id']}: {e}")
-            offset += 1000
-            print(f"[Migration] Fixed {total_fixed} readings so far...")
-
-        sb.table("system_settings").upsert(
-            {"key": "utc_to_ast_done", "value": {"done": True, "count": total_fixed}},
-            on_conflict="key"
-        ).execute()
-        print(f"[Migration] ✓ Fixed {total_fixed} enggenv timestamps (-3h)")
-    except Exception as e:
-        print(f"[Migration] timestamp migration error: {e}")
-        import traceback
-        traceback.print_exc()
 
 @asynccontextmanager
 async def lifespan(app):
@@ -399,9 +350,6 @@ async def lifespan(app):
         print("="*60 + "\n")
     else:
         print("[ALERT ENGINE] ✓ All alert tables present")
-
-    # One-time migration: fix historical enggenv timestamps (subtract 3h)
-    run_timestamp_migration()
 
     pi = int(os.getenv("POLL_INTERVAL", "300"))
     asyncio.create_task(poll_all())
@@ -439,6 +387,44 @@ def alerts_db_health():
 async def trigger_poll():
     await poll_all()
     return {"status": "ok"}
+
+@app.post("/api/migrate/fix-timestamps")
+async def fix_timestamps():
+    """One-time endpoint: subtract 3h from all enggenv readings. Call once, then ignore."""
+    if not sb:
+        raise HTTPException(503, "No Supabase")
+    try:
+        result = sb.table("system_settings").select("value").eq("key", "utc_to_ast_done").execute()
+        if result.data:
+            return {"status": "already_done"}
+    except Exception:
+        pass
+
+    total = 0
+    offset = 0
+    while True:
+        batch = sb.table("readings").select("id, timestamp").eq("source", "enggenv").order("timestamp").range(offset, offset + 499).execute()
+        if not batch.data:
+            break
+        for row in batch.data:
+            try:
+                old_ts = row["timestamp"]
+                if "T" in old_ts:
+                    dt = datetime.fromisoformat(old_ts.replace("Z", "+00:00").replace("+00:00", ""))
+                else:
+                    dt = datetime.strptime(old_ts, "%Y-%m-%d %H:%M:%S")
+                new_ts = (dt - timedelta(hours=3)).strftime("%Y-%m-%d %H:%M:%S")
+                sb.table("readings").update({"timestamp": new_ts}).eq("id", row["id"]).execute()
+                total += 1
+            except Exception:
+                pass
+        offset += 500
+
+    sb.table("system_settings").upsert(
+        {"key": "utc_to_ast_done", "value": {"done": True, "count": total}},
+        on_conflict="key"
+    ).execute()
+    return {"status": "done", "fixed": total}
 
 @app.websocket("/ws")
 async def ws_ep(ws: WebSocket):
